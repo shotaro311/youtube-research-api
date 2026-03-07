@@ -1,0 +1,558 @@
+.shell {
+  width: min(1440px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+  padding: 32px;
+  color: var(--console-primary-text);
+}
+
+.hero,
+.panel,
+.infoCard,
+.cardField,
+.heroFlowCard,
+.urlRow,
+.optionChip {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.hero {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.8fr);
+  align-items: start;
+  min-height: var(--console-hero-min-height);
+  padding: 28px;
+  border-radius: 28px;
+  background: var(--console-panel);
+}
+
+.heroSingle {
+  grid-template-columns: 1fr;
+}
+
+.heroCopy,
+.heroFlowCard,
+.panel,
+.formStack,
+.infoCard,
+.previewStack,
+.previewSection {
+  display: grid;
+}
+
+.heroCopy {
+  gap: 18px;
+}
+
+.eyebrow,
+.heroFlowLabel,
+.panelKicker,
+.infoTitle,
+.cardLabel,
+.urlIndex,
+.previewCount,
+.contentRow span {
+  margin: 0;
+  color: var(--console-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.hero h1,
+.heroFlowCard h2,
+.panelIntro h2,
+.infoCard h3,
+.previewHeader h3 {
+  margin: 0;
+  font-family: var(--font-body), sans-serif;
+  font-weight: 600;
+}
+
+.hero h1 {
+  max-width: none;
+  font-size: var(--console-hero-headline-size);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.lead {
+  font-size: var(--console-hero-lead-size);
+}
+
+.lead,
+.cardSupport,
+.sourceMeta,
+.captionText,
+.emptyText,
+.contentRow p,
+.statusLine,
+.metaLine,
+.heroFlowItem p,
+.actionHint {
+  margin: 0;
+  color: var(--console-secondary-text);
+  line-height: 1.7;
+}
+
+.heroFlowCard {
+  gap: 16px;
+  min-height: 100%;
+  padding: 24px;
+  border-radius: 24px;
+  background: var(--console-card);
+}
+
+.heroFlowLabel,
+.panelKicker,
+.infoTitle,
+.cardLabel,
+.previewCount,
+.contentRow span {
+  color: var(--console-tertiary-text);
+  letter-spacing: normal;
+}
+
+.heroFlowCard h2 {
+  font-size: 1.75rem;
+  line-height: 1.25;
+}
+
+.heroFlowList {
+  display: grid;
+  gap: 14px;
+}
+
+.heroFlowItem {
+  display: grid;
+  gap: 4px;
+}
+
+.heroFlowItem strong {
+  color: var(--console-primary-text);
+  font-size: 0.95rem;
+}
+
+.panels {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.panel {
+  gap: 18px;
+  align-content: start;
+  min-height: var(--console-panel-min-height);
+  padding: 24px;
+  border-radius: 26px;
+  background: var(--console-panel);
+}
+
+.panelIntro {
+  display: grid;
+  gap: 8px;
+}
+
+.panelIntro h2 {
+  font-size: var(--console-panel-heading-size, 28px);
+  line-height: 1.2;
+}
+
+.formStack {
+  gap: 12px;
+}
+
+.cardField,
+.infoCard {
+  gap: 8px;
+  min-height: var(--card-min-height, auto);
+  padding: 18px;
+  border-radius: 18px;
+  background: var(--console-card);
+}
+
+.infoCard {
+  gap: 10px;
+  border-radius: 22px;
+}
+
+.cardInput,
+.urlInput,
+.cardTextarea {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--console-input-text);
+}
+
+.cardInput {
+  font-size: 18px;
+}
+
+.urlInput,
+.cardTextarea {
+  font-size: 15px;
+}
+
+.cardTextarea {
+  min-height: 112px;
+  resize: vertical;
+  line-height: 1.7;
+  font-family: inherit;
+}
+
+.cardInput::placeholder,
+.urlInput::placeholder,
+.cardTextarea::placeholder {
+  color: color-mix(in srgb, var(--console-input-text) 35%, transparent);
+}
+
+.cardInput:focus,
+.urlInput:focus,
+.cardTextarea:focus {
+  outline: none;
+}
+
+.actionRow,
+.listFooter,
+.previewHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.summaryActions {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.actionButtonWrap {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  align-content: start;
+}
+
+.actionHint {
+  font-size: 13px;
+}
+
+.primaryButton,
+.secondaryButton,
+.tertiaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  width: var(--button-width, fit-content);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 160ms ease, opacity 160ms ease, background 160ms ease;
+}
+
+.primaryButton:hover:not(:disabled),
+.secondaryButton:hover:not(:disabled),
+.tertiaryButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.tertiaryButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.primaryButton {
+  min-height: 57px;
+  padding: 0 18px;
+  border-radius: 18px;
+  background: var(--console-accent);
+  color: var(--console-dark-text);
+}
+
+.secondaryButton {
+  min-height: 57px;
+  padding: 0 18px;
+  border-radius: 18px;
+  background: var(--console-secondary-button);
+  color: var(--console-input-text);
+}
+
+.tertiaryButton {
+  min-height: 43px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: var(--console-secondary-button);
+  color: var(--console-input-text);
+}
+
+.errorText {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(220, 38, 38, 0.15);
+  color: #fecaca;
+}
+
+.infoCard h3 {
+  font-size: clamp(1.2rem, 2vw, 1.5rem);
+  line-height: 1.45;
+}
+
+.sourceMeta {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.urlListCard,
+.extractorDataCard {
+  align-content: start;
+}
+
+.urlListCard {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+.previewStack {
+  display: grid;
+  gap: 10px;
+}
+
+.urlTextareaWrap {
+  display: grid;
+  min-height: 0;
+  height: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--console-panel) 86%, transparent);
+}
+
+.urlTextarea {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  resize: none;
+  border: 0;
+  background: transparent;
+  color: var(--console-input-text);
+  font-size: 15px;
+  line-height: 1.7;
+  font-family: inherit;
+}
+
+.urlTextarea::placeholder {
+  color: color-mix(in srgb, var(--console-input-text) 35%, transparent);
+}
+
+.urlTextarea:focus {
+  outline: none;
+}
+
+.listFooter {
+  justify-content: flex-end;
+}
+
+.captionText {
+  font-size: 13px;
+  color: var(--console-tertiary-text);
+}
+
+.metaLine,
+.statusLine {
+  color: var(--console-input-text);
+}
+
+.statusBlock {
+  display: grid;
+  gap: 6px;
+}
+
+.previewSection {
+  gap: 10px;
+  min-height: 0;
+}
+
+.resultCardList {
+  display: grid;
+  gap: 14px;
+}
+
+.resultCard {
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--console-panel) 88%, transparent);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.resultSummary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.resultSummary::-webkit-details-marker {
+  display: none;
+}
+
+.resultSummaryText {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.resultCardTitle {
+  margin: 0;
+  color: var(--console-primary-text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.resultCardBody {
+  display: grid;
+  gap: 12px;
+  padding: 0 16px 16px;
+}
+
+.resultUrl {
+  margin: 0;
+  color: var(--console-input-text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.resultStatusLoading,
+.resultStatusSuccess,
+.resultStatusError {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.resultStatusLoading {
+  color: var(--console-tertiary-text);
+}
+
+.resultStatusSuccess {
+  color: var(--console-accent);
+}
+
+.resultStatusError {
+  color: #fca5a5;
+}
+
+.loadingDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--console-accent);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.previewHeader {
+  justify-content: space-between;
+}
+
+.previewHeader h3 {
+  font-size: 15px;
+}
+
+.scrollPane {
+  max-height: 220px;
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.contentRow {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.contentRow:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.contentRow p {
+  font-size: 14px;
+}
+
+@media (max-width: 1080px) {
+  .hero,
+  .panels {
+    grid-template-columns: 1fr;
+  }
+
+  .hero h1 {
+    max-width: none;
+  }
+
+  .panel {
+    min-height: auto;
+  }
+
+  .hero h1,
+  .panelIntro h2 {
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+  }
+
+  .hero,
+  .panel,
+  .cardField,
+  .infoCard {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .shell {
+    padding: 18px 14px 28px;
+  }
+
+  .hero,
+  .panel {
+    padding: 22px;
+    border-radius: 24px;
+  }
+
+  .actionRow,
+  .listFooter {
+    align-items: stretch;
+  }
+
+  .actionButtonWrap,
+  .primaryButton,
+  .secondaryButton,
+  .tertiaryButton {
+    width: 100%;
+  }
+}

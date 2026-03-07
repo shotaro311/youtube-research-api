@@ -1,0 +1,509 @@
+{
+  "version": "2.8",
+  "children": [
+    {
+      "type": "frame",
+      "id": "bi8Au",
+      "x": 0,
+      "y": 0,
+      "name": "YouTube Research Console",
+      "clip": true,
+      "width": 1440,
+      "height": 1500,
+      "fill": "#050816",
+      "layout": "vertical",
+      "gap": 24,
+      "padding": 32,
+      "children": [
+        {
+          "type": "frame",
+          "id": "4H2j8",
+          "name": "Hero",
+          "width": "fill_container",
+          "height": 194,
+          "fill": "#0B1220",
+          "cornerRadius": 28,
+          "gap": 24,
+          "padding": 28,
+          "children": [
+            {
+              "type": "frame",
+              "id": "YTv22",
+              "name": "Hero Left",
+              "width": 884,
+              "height": 166,
+              "layout": "vertical",
+              "gap": 18,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "nyvjD",
+                  "name": "eyebrow",
+                  "fill": "#C9A962",
+                  "content": "YOUTUBE リサーチツール",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "kcFvO",
+                  "name": "headline",
+                  "fill": "#ffffff",
+                  "content": "YouTubeリサーチツール",
+                  "fontFamily": "Inter",
+                  "fontSize": 40,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "VMCqr",
+                  "name": "lead",
+                  "fill": "#B6BDC8",
+                  "content": "チャンネル・再生リスト・動画URLを入力して、動画一覧の取得から動画データの抽出まで進められる、リサーチ向けの操作画面です。",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "AYvYE",
+          "name": "Panels",
+          "width": "fill_container",
+          "height": 1203,
+          "gap": 24,
+          "children": [
+            {
+              "type": "frame",
+              "id": "rtnpf",
+              "name": "Resolver Panel",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "#0B1220",
+              "cornerRadius": 26,
+              "layout": "vertical",
+              "gap": 18,
+              "padding": 24,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "wsJVw",
+                  "fill": "#C9A962",
+                  "content": "動画一覧取得",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "V9cRk",
+                  "fill": "#FFFFFF",
+                  "textGrowth": "fixed-width-height",
+                  "width": 619,
+                  "height": 49,
+                  "content": "チャンネル / 再生リストURL→動画URLを一括取得",
+                  "fontFamily": "Inter",
+                  "fontSize": 27,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "iDOAU",
+                  "name": "Resolver Input",
+                  "width": "fill_container",
+                  "height": 92,
+                  "fill": "#111827",
+                  "cornerRadius": 18,
+                  "layout": "vertical",
+                  "gap": 8,
+                  "padding": 18,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "RqPzu",
+                      "fill": "#8A8F98",
+                      "content": "入力URL",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "Swxh6",
+                      "fill": "#E5E7EB",
+                      "content": "https://www.youtube.com/@example",
+                      "fontFamily": "Inter",
+                      "fontSize": 18,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "6Xz7j",
+                  "name": "Resolver Actions",
+                  "width": 628,
+                  "height": 57,
+                  "gap": 12,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "TRo5q",
+                      "name": "Resolver Action Primary",
+                      "width": 188,
+                      "height": 57,
+                      "fill": "#C9A962",
+                      "cornerRadius": 18,
+                      "layout": "vertical",
+                      "gap": 8,
+                      "padding": 18,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "qWA5e",
+                          "fill": "#0A0A0A",
+                          "content": "動画一覧を取得する",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ASEZS",
+                      "name": "Resolver Action Send",
+                      "width": 132,
+                      "height": 57,
+                      "fill": "#243042",
+                      "cornerRadius": 18,
+                      "layout": "vertical",
+                      "gap": 8,
+                      "padding": 18,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Q5ul8",
+                          "fill": "#E5E7EB",
+                          "content": "抽出へ送る",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "getyN",
+                  "name": "Resolver Summary",
+                  "width": "fill_container",
+                  "height": 156,
+                  "fill": "#111827",
+                  "cornerRadius": 22,
+                  "layout": "vertical",
+                  "gap": 10,
+                  "padding": 20,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "m91Jr",
+                      "fill": "#8A8F98",
+                      "content": "取得結果",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "lqxvM",
+                      "fill": "#FFFFFF",
+                      "content": "プレイリスト / 24件 / Shorts 2件・ライブ 1件を除外",
+                      "fontFamily": "Inter",
+                      "fontSize": 22,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "CrHpd",
+                      "fill": "#B6BDC8",
+                      "content": "一覧から動画URLを選んで、右の抽出欄へ入れられます",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "0e3Pg",
+                  "name": "Resolver List",
+                  "width": 628,
+                  "height": 652,
+                  "fill": "#111827",
+                  "cornerRadius": 22,
+                  "layout": "vertical",
+                  "gap": 12,
+                  "padding": 20,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "wNTCm",
+                      "fill": "#8A8F98",
+                      "content": "取得した動画URL",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "QWmlO",
+                      "fill": "#B6BDC8",
+                      "content": "各URLを改行区切りでまとめて編集できます",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Pe353",
+                      "name": "Resolver URL Textarea",
+                      "width": 588,
+                      "height": 547,
+                      "fill": "#0B1220",
+                      "cornerRadius": 14,
+                      "layout": "vertical",
+                      "padding": 14,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "KiKR2",
+                          "fill": "#D7DCE3",
+                          "content": "https://www.youtube.com/watch?v=alpha000001\nhttps://www.youtube.com/watch?v=alpha000002\nhttps://www.youtube.com/watch?v=alpha000003\nhttps://www.youtube.com/watch?v=alpha000004\nhttps://www.youtube.com/watch?v=alpha000005\nhttps://www.youtube.com/watch?v=alpha000006",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "qXHU6",
+              "name": "Extractor Panel",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "#0B1220",
+              "cornerRadius": 26,
+              "layout": "vertical",
+              "gap": 18,
+              "padding": 24,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "CusXk",
+                  "fill": "#C9A962",
+                  "content": "動画抽出",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "OyUV7",
+                  "fill": "#FFFFFF",
+                  "textGrowth": "fixed-width-height",
+                  "width": 628,
+                  "height": 49,
+                  "content": "動画URL→動画データを抽出",
+                  "fontFamily": "Inter",
+                  "fontSize": 28,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "ujXZR",
+                  "name": "Extractor Input",
+                  "width": "fill_container",
+                  "height": 92,
+                  "fill": "#111827",
+                  "cornerRadius": 18,
+                  "layout": "vertical",
+                  "gap": 8,
+                  "padding": 18,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "nx7R7",
+                      "fill": "#8A8F98",
+                      "content": "動画URL",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "FjGjQ",
+                      "fill": "#E5E7EB",
+                      "content": "watch?v=dQw4w9WgXcQ\nwatch?v=abcdefghijk",
+                      "fontFamily": "Inter",
+                      "fontSize": 18,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "W135s",
+                  "name": "Extractor Actions",
+                  "width": "fill_container",
+                  "height": 57,
+                  "gap": 12,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "Q9tzF",
+                      "name": "Extractor Action",
+                      "width": 195,
+                      "height": 57,
+                      "fill": "#C9A962",
+                      "cornerRadius": 18,
+                      "layout": "vertical",
+                      "gap": 8,
+                      "padding": 18,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "OTgyh",
+                          "fill": "#0A0A0A",
+                          "content": "動画データを抽出する",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "O4xSv",
+                      "name": "Extractor Action Comments Only",
+                      "width": 148,
+                      "height": 57,
+                      "fill": "#243042",
+                      "cornerRadius": 18,
+                      "layout": "vertical",
+                      "gap": 8,
+                      "padding": 18,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "zLsGi",
+                          "name": "commentOnlyLabel",
+                          "fill": "#E5E7EB",
+                          "content": "コメントのみ",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Ws3Lp",
+                  "name": "Extractor Summary",
+                  "width": "fill_container",
+                  "height": 196,
+                  "fill": "#111827",
+                  "cornerRadius": 22,
+                  "layout": "vertical",
+                  "gap": 10,
+                  "padding": 20,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "lPnDP",
+                      "fill": "#8A8F98",
+                      "content": "動画概要",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "z9ivf",
+                      "fill": "#FFFFFF",
+                      "content": "2件のURLを抽出",
+                      "fontFamily": "Inter",
+                      "fontSize": 24,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "IYqOo",
+                      "fill": "#D7DCE3",
+                      "content": "成功 2件 / 失敗 0件 / モード 通常抽出",
+                      "fontFamily": "Inter",
+                      "fontSize": 16,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "KiBQI",
+                  "name": "Extractor Data",
+                  "width": "fill_container",
+                  "height": 612,
+                  "fill": "#111827",
+                  "cornerRadius": 22,
+                  "layout": "vertical",
+                  "gap": 12,
+                  "padding": 20,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "fWxx0",
+                      "fill": "#8A8F98",
+                      "content": "取得状況とプレビュー",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "R72Gn",
+                      "fill": "#D7DCE3",
+                      "content": "URLごとの抽出結果カードがここに縦並びで表示されます",
+                      "fontFamily": "Inter",
+                      "fontSize": 16,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "JH0iF",
+                      "fill": "#B6BDC8",
+                      "content": "各カードでタイトル・診断結果・字幕・コメントを確認できます。",
+                      "fontFamily": "Inter",
+                      "fontSize": 15,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

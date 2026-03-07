@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.next/
+.turbo/
+tsconfig.tsbuildinfo
+.env
+.env.local
+coverage/
+.DS_Store
+gen-lang-client-*.json
+.serena/
+.vercel/

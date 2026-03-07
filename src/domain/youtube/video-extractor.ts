@@ -1,4 +1,5 @@
 import { execFile as execFileCb } from "child_process";
+import { existsSync } from "fs";
 import { readFile, mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -27,7 +28,9 @@ const TRANSCRIPT_FALLBACK_TIMEOUT_MS = 10000;
 const TRANSCRIPT_PLUS_TIMEOUT_MS = 12000;
 const COMMENTS_TIMEOUT_MS = 10000;
 const YT_DLP_TIMEOUT_MS = 30000;
-const YT_DLP_BINARY = process.env.YT_DLP_PATH || "yt-dlp";
+const YT_DLP_VERSION_TIMEOUT_MS = 20000;
+const BUNDLED_YT_DLP_BINARY = join(process.cwd(), "vendor", "yt-dlp", "yt-dlp");
+const YT_DLP_BINARY = process.env.YT_DLP_PATH || (existsSync(BUNDLED_YT_DLP_BINARY) ? BUNDLED_YT_DLP_BINARY : "yt-dlp");
 const YT_DLP_JS_RUNTIME = process.env.YT_DLP_JS_RUNTIME || "node";
 const DESKTOP_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -655,13 +658,8 @@ async function fetchTranscriptFromInnertubeAndroid(videoId: string): Promise<Tra
 async function isYtDlpAvailable(): Promise<boolean> {
   if (ytDlpAvailableCache !== null) return ytDlpAvailableCache;
 
-  if (process.env.VERCEL || process.env.CLOUDFLARE_WORKERS || process.env.AWS_LAMBDA_FUNCTION_NAME) {
-    ytDlpAvailableCache = false;
-    return false;
-  }
-
   try {
-    await execFile(YT_DLP_BINARY, ["--version"], { timeout: 5000 });
+    await execFile(YT_DLP_BINARY, ["--version"], { timeout: YT_DLP_VERSION_TIMEOUT_MS });
     ytDlpAvailableCache = true;
   } catch {
     ytDlpAvailableCache = false;
@@ -712,7 +710,12 @@ async function fetchTranscriptFromYtDlp(videoId: string): Promise<TranscriptSegm
       `https://www.youtube.com/watch?v=${videoId}`,
     ];
 
-    await execFile(YT_DLP_BINARY, args, { timeout: YT_DLP_TIMEOUT_MS });
+    let execError: Error | null = null;
+    try {
+      await execFile(YT_DLP_BINARY, args, { timeout: YT_DLP_TIMEOUT_MS });
+    } catch (error) {
+      execError = error instanceof Error ? error : new Error(String(error));
+    }
 
     let bestSegments: TranscriptSegmentRow[] = [];
     const languagePriority = ["ja", "ja-orig", "en", "en-orig"];
@@ -740,6 +743,10 @@ async function fetchTranscriptFromYtDlp(videoId: string): Promise<TranscriptSegm
       } catch {
         // skip invalid file
       }
+    }
+
+    if (bestSegments.length === 0 && execError) {
+      throw execError;
     }
 
     return bestSegments;

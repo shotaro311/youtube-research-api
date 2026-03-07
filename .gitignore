@@ -12,3 +12,4 @@ gen-lang-client-*.json
 .vercel/
 .vercel
 .env*.local
+vendor/yt-dlp/

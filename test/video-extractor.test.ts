@@ -5,6 +5,10 @@ const { fetchTranscriptMock, getSubtitlesMock } = vi.hoisted(() => ({
   getSubtitlesMock: vi.fn(),
 }));
 
+vi.hoisted(() => {
+  process.env.YT_DLP_PATH = "__missing_test_ytdlp__";
+});
+
 vi.mock("youtube-caption-extractor", () => ({
   getSubtitles: getSubtitlesMock,
 }));
@@ -83,6 +87,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
   delete process.env.VERCEL;
+  delete process.env.YT_DLP_PATH;
   delete process.env.YOUTUBE_API_KEY;
 });
 

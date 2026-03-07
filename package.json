@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "postinstall": "node scripts/prepare-ytdlp.mjs",
     "build": "next build",
     "start": "next start",
     "type-check": "tsc --noEmit",

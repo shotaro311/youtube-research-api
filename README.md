@@ -45,6 +45,7 @@ npm run verify
 - 抽出結果カードは初期状態ではタイトルとURLだけを表示し、開くと詳細を確認できます
 - 抽出成功した動画は `AI抽出` シートへ反映できます。認証は `GOOGLE_APPLICATION_CREDENTIALS` またはリポジトリ直下のサービスアカウントJSONを使います
 - Vercel などファイル配置できない環境では `GOOGLE_APPLICATION_CREDENTIALS_JSON` にサービスアカウントJSON全文を設定すると、Sheets 連携をそのまま使えます
+- `npm install` 時に公式 `yt-dlp` バイナリを `vendor/yt-dlp/yt-dlp` へ取得し、Vercel 本番でも字幕 fallback として使います
 - シート反映時は要約行を `AI抽出` に追記しつつ、字幕全文とコメント全文を `台本DB` に保存します。`AI抽出` の `台本` / `コメント` 列から `/scripts/[scriptId]` の閲覧ページを開け、同ページから JSON もダウンロードできます
 - 共有できる URL をシートへ書き込みたい場合は `SCRIPT_VIEWER_BASE_URL` に公開URLを設定してください。未設定時はリクエスト元 origin を使います
 - `.pen` を更新したら、開発中は画面を再読込、本番反映は再ビルドで同期されます

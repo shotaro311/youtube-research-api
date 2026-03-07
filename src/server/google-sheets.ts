@@ -41,24 +41,61 @@ export type StoredScriptDocument = {
   comments: string;
 };
 
+type ServiceAccountCredentials = {
+  client_email: string;
+  private_key: string;
+};
+
+function normalizeEnvValue(value?: string): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const hasDoubleQuotes = trimmed.startsWith("\"") && trimmed.endsWith("\"");
+  const hasSingleQuotes = trimmed.startsWith("'") && trimmed.endsWith("'");
+  if (hasDoubleQuotes || hasSingleQuotes) {
+    return trimmed.slice(1, -1).trim();
+  }
+
+  return trimmed;
+}
+
+function getConfiguredValue(name: string, fallback: string): string {
+  return normalizeEnvValue(process.env[name]) || fallback;
+}
+
 function getCredentialsPath(): string {
-  return process.env.GOOGLE_APPLICATION_CREDENTIALS || join(process.cwd(), DEFAULT_CREDENTIALS_FILE);
+  return normalizeEnvValue(process.env.GOOGLE_APPLICATION_CREDENTIALS) || join(process.cwd(), DEFAULT_CREDENTIALS_FILE);
 }
 
 function getSpreadsheetId(): string {
-  return process.env.GOOGLE_SHEETS_SPREADSHEET_ID || DEFAULT_SPREADSHEET_ID;
+  return getConfiguredValue("GOOGLE_SHEETS_SPREADSHEET_ID", DEFAULT_SPREADSHEET_ID);
 }
 
 function getSheetName(): string {
-  return process.env.GOOGLE_SHEETS_SHEET_NAME || DEFAULT_SHEET_NAME;
+  return getConfiguredValue("GOOGLE_SHEETS_SHEET_NAME", DEFAULT_SHEET_NAME);
 }
 
 function getScriptDbSheetName(): string {
-  return process.env.GOOGLE_SHEETS_SCRIPT_DB_SHEET_NAME || DEFAULT_SCRIPT_DB_SHEET_NAME;
+  return getConfiguredValue("GOOGLE_SHEETS_SCRIPT_DB_SHEET_NAME", DEFAULT_SCRIPT_DB_SHEET_NAME);
 }
 
 function normalizeBaseUrl(value?: string): string {
-  return typeof value === "string" ? value.trim().replace(/\/+$/, "") : "";
+  return normalizeEnvValue(value).replace(/\/+$/, "");
+}
+
+function parseCredentialsJson(value: string): ServiceAccountCredentials {
+  try {
+    const parsed = JSON.parse(normalizeEnvValue(value)) as ServiceAccountCredentials | string;
+    return typeof parsed === "string" ? (JSON.parse(parsed) as ServiceAccountCredentials) : parsed;
+  } catch {
+    throw new UpstreamServiceError("Google Sheets 認証JSONの形式が不正です。");
+  }
 }
 
 function buildTranscriptBody(item: ExtractVideoResponse): string {
@@ -200,21 +237,12 @@ export function buildScriptDbRows(
 }
 
 async function createSheetsClient() {
-  const credentialsJson = process.env[GOOGLE_CREDENTIALS_JSON_ENV];
+  const credentialsJson = normalizeEnvValue(process.env[GOOGLE_CREDENTIALS_JSON_ENV]);
   const auth = credentialsJson
-    ? (() => {
-        try {
-          return new google.auth.GoogleAuth({
-            credentials: JSON.parse(credentialsJson) as {
-              client_email: string;
-              private_key: string;
-            },
-            scopes: [SHEETS_SCOPE],
-          });
-        } catch {
-          throw new UpstreamServiceError("Google Sheets 認証JSONの形式が不正です。");
-        }
-      })()
+    ? new google.auth.GoogleAuth({
+        credentials: parseCredentialsJson(credentialsJson),
+        scopes: [SHEETS_SCOPE],
+      })
     : await (async () => {
         const keyFile = getCredentialsPath();
         await access(keyFile).catch(() => {

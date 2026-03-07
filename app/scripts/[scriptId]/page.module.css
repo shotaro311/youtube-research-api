@@ -278,6 +278,32 @@
   font-size: 13px;
 }
 
+.sectionHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.copyButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 132px;
+  padding: 10px 14px;
+  border: 1px solid rgba(146, 178, 229, 0.28);
+  border-radius: 999px;
+  background: rgba(11, 29, 58, 0.82);
+  color: #eef4ff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.copyButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .preformatted {
   margin: 0;
   white-space: pre-wrap;
@@ -336,6 +362,16 @@
   .formattedHeader {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .sectionHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .sectionHeaderActions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .formatButton {

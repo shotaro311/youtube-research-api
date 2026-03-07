@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { readStoredScript } from "../../../src/server/google-sheets";
+import { CopyContentButton } from "./copy-content-button";
 import { FormattedTranscriptPanel } from "./formatted-transcript-panel";
 import styles from "./page.module.css";
 
@@ -174,13 +175,19 @@ export default async function ScriptPage({ params, searchParams }: ScriptPagePro
 
         <div className={styles.sectionHeader}>
           <h2>{currentTitle}</h2>
-          <span>
-            {activeTab === "comments" && comments.length > 0
-              ? `${comments.length}件`
-              : currentText
-                ? "保存済み"
-                : "未取得"}
-          </span>
+          <div className={styles.sectionHeaderActions}>
+            <span>
+              {activeTab === "comments" && comments.length > 0
+                ? `${comments.length}件`
+                : currentText
+                  ? "保存済み"
+                  : "未取得"}
+            </span>
+            <CopyContentButton
+              text={currentText}
+              idleLabel={activeTab === "comments" ? "コメントをコピー" : "台本をコピー"}
+            />
+          </div>
         </div>
         {activeTab === "transcript" ? <FormattedTranscriptPanel scriptId={script.scriptId} /> : null}
         {activeTab === "comments" ? (

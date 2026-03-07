@@ -26,6 +26,7 @@ cp .env.example .env
 
 ```bash
 YOUTUBE_API_KEY=your_api_key
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
 ## Scripts
@@ -39,6 +40,7 @@ npm run verify
 ## Notes
 
 - 必須環境変数は `YOUTUBE_API_KEY` です
+- 台本ビューアの `Geminiで整形` を使う場合は `GEMINI_API_KEY` も設定してください
 - `/` の主要文言・基調色・主要カード高さ・主要ボタン幅は `docs/sample/youtube-research-console.pen` をサーバー側で読み込んで反映します
 - 動画抽出カードでは、通常抽出に加えて `コメントのみ` ボタンから字幕なしのコメント抽出も行えます
 - 動画抽出カードでは、複数URLを改行区切りで貼り付けて一括抽出し、URLごとの結果カードを縦に並べて確認できます
@@ -49,6 +51,7 @@ npm run verify
 - Vercel では字幕抽出 API を `hnd1` 優先で動かし、日本リージョン寄りで YouTube 抽出の安定化を図ります
 - YouTube の bot check に当たる場合は、任意で `YT_DLP_COOKIES_PATH` または `YT_DLP_COOKIES_BASE64` を設定すると `yt-dlp` に cookies を渡せます
 - シート反映時は要約行を `AI抽出` に追記しつつ、字幕全文とコメント全文を `台本DB` に保存します。`AI抽出` の `台本` / `コメント` 列から `/scripts/[scriptId]` の閲覧ページを開け、同ページから JSON もダウンロードできます
+- `/scripts/[scriptId]` の台本タブでは `Geminiで整形` ボタンから、元の保存内容を変えずに見出しや区切りを整えた読みやすい表示を生成できます
 - 共有できる URL をシートへ書き込みたい場合は `SCRIPT_VIEWER_BASE_URL` に公開URLを設定してください。未設定時はリクエスト元 origin を使います
 - `.pen` を更新したら、開発中は画面を再読込、本番反映は再ビルドで同期されます
 - 詳細仕様は `docs/requirement/requirements.md` を参照してください

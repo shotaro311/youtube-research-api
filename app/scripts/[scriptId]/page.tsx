@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { readStoredScript } from "../../../src/server/google-sheets";
+import { FormattedTranscriptPanel } from "./formatted-transcript-panel";
 import styles from "./page.module.css";
 
 export const runtime = "nodejs";
@@ -181,6 +182,7 @@ export default async function ScriptPage({ params, searchParams }: ScriptPagePro
                 : "未取得"}
           </span>
         </div>
+        {activeTab === "transcript" ? <FormattedTranscriptPanel scriptId={script.scriptId} /> : null}
         {activeTab === "comments" ? (
           comments.length > 0 ? (
             <div className={styles.commentList}>

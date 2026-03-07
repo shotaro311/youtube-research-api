@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ExtractVideoResponse } from "../src/domain/youtube/types";
 
-const { appendMock, googleAuthMock, sheetsFactoryMock } = vi.hoisted(() => ({
+const { appendMock, batchUpdateMock, getMock, googleAuthMock, sheetsFactoryMock } = vi.hoisted(() => ({
   appendMock: vi.fn(),
+  batchUpdateMock: vi.fn(),
+  getMock: vi.fn(),
   googleAuthMock: vi.fn(function GoogleAuthMock(this: { mocked: boolean }) {
     this.mocked = true;
   }),
@@ -12,6 +14,8 @@ const { appendMock, googleAuthMock, sheetsFactoryMock } = vi.hoisted(() => ({
       values: {
         append: appendMock,
       },
+      batchUpdate: batchUpdateMock,
+      get: getMock,
     },
   })),
 }));
@@ -66,7 +70,28 @@ afterEach(() => {
 
 describe("appendAiExtractRows", () => {
   it("trims spreadsheet settings loaded from environment variables", async () => {
-    appendMock.mockResolvedValue({});
+    appendMock
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        data: {
+          updates: {
+            updatedRange: "AI抽出!A2:K2",
+          },
+        },
+      });
+    getMock.mockResolvedValue({
+      data: {
+        sheets: [
+          {
+            properties: {
+              sheetId: 916855654,
+              title: "AI抽出",
+            },
+          },
+        ],
+      },
+    });
+    batchUpdateMock.mockResolvedValue({});
     process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON = JSON.stringify({
       client_email: "service-account@example.com",
       private_key: "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n",
@@ -105,5 +130,47 @@ describe("appendAiExtractRows", () => {
     );
     expect(secondCall?.requestBody?.values?.[0]?.[9]).toMatch(/^=HYPERLINK\("https:\/\/example\.com\/scripts\//);
     expect(secondCall?.requestBody?.values?.[0]?.[10]).toMatch(/^=HYPERLINK\("https:\/\/example\.com\/scripts\//);
+    expect(secondCall?.requestBody?.values?.[0]?.[1]).toBe(
+      '=IMAGE("https://i.ytimg.com/vi/abc123/hqdefault.jpg",4,162,288)',
+    );
+    expect(getMock).toHaveBeenCalledWith({
+      spreadsheetId: "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME",
+      fields: "sheets(properties(sheetId,title))",
+    });
+    expect(batchUpdateMock).toHaveBeenCalledWith({
+      spreadsheetId: "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME",
+      requestBody: {
+        requests: [
+          {
+            updateDimensionProperties: {
+              range: {
+                sheetId: 916855654,
+                dimension: "ROWS",
+                startIndex: 1,
+                endIndex: 2,
+              },
+              properties: {
+                pixelSize: 178,
+              },
+              fields: "pixelSize",
+            },
+          },
+          {
+            updateDimensionProperties: {
+              range: {
+                sheetId: 916855654,
+                dimension: "COLUMNS",
+                startIndex: 1,
+                endIndex: 2,
+              },
+              properties: {
+                pixelSize: 304,
+              },
+              fields: "pixelSize",
+            },
+          },
+        ],
+      },
+    });
   });
 });

@@ -18,6 +18,11 @@ type ScriptPageProps = {
 
 type ViewerTab = "transcript" | "comments";
 
+type StoredComment = {
+  author: string;
+  text: string;
+};
+
 function formatPublishedAt(value?: string): string {
   if (!value) {
     return "未取得";
@@ -29,6 +34,51 @@ function formatPublishedAt(value?: string): string {
 
 function formatCount(value?: number): string {
   return typeof value === "number" ? new Intl.NumberFormat("ja-JP").format(value) : "未取得";
+}
+
+function parseStoredComments(value: string): StoredComment[] {
+  if (!value) {
+    return [];
+  }
+
+  const comments: StoredComment[] = [];
+  let current: StoredComment | null = null;
+
+  for (const rawLine of value.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+
+    const separatorIndex = line.indexOf(": ");
+    if (separatorIndex > 0) {
+      if (current) {
+        comments.push(current);
+      }
+
+      current = {
+        author: line.slice(0, separatorIndex),
+        text: line.slice(separatorIndex + 2),
+      };
+      continue;
+    }
+
+    if (current) {
+      current.text = `${current.text}\n${line}`.trim();
+      continue;
+    }
+
+    current = {
+      author: "投稿者不明",
+      text: line,
+    };
+  }
+
+  if (current) {
+    comments.push(current);
+  }
+
+  return comments;
 }
 
 export default async function ScriptPage({ params, searchParams }: ScriptPageProps): Promise<React.JSX.Element> {
@@ -43,6 +93,7 @@ export default async function ScriptPage({ params, searchParams }: ScriptPagePro
   const activeTab: ViewerTab = tab === "comments" ? "comments" : "transcript";
   const currentText = activeTab === "comments" ? script.comments : script.transcript;
   const currentTitle = activeTab === "comments" ? "コメント全文" : "台本全文";
+  const comments = activeTab === "comments" ? parseStoredComments(script.comments) : [];
 
   return (
     <main className={styles.page}>
@@ -67,24 +118,41 @@ export default async function ScriptPage({ params, searchParams }: ScriptPagePro
       </div>
 
       <section className={styles.summaryCard}>
-        <dl className={styles.summaryGrid}>
-          <div>
-            <dt>動画URL</dt>
-            <dd>{script.url || "未取得"}</dd>
-          </div>
-          <div>
-            <dt>登録者数</dt>
-            <dd>{formatCount(script.subscribers)}</dd>
-          </div>
-          <div>
-            <dt>保存日時</dt>
-            <dd>{formatPublishedAt(script.createdAt)}</dd>
-          </div>
-          <div>
-            <dt>動画ID</dt>
-            <dd>{script.videoId || "未取得"}</dd>
-          </div>
-        </dl>
+        <div className={styles.summaryLayout}>
+          {script.thumbnailUrl ? (
+            <a
+              href={script.thumbnailUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={styles.thumbnailLink}
+              title="クリックで拡大表示"
+            >
+              <div className={styles.thumbnailFrame}>
+                <img src={script.thumbnailUrl} alt={`${script.title || "動画"} のサムネイル`} className={styles.thumbnail} />
+              </div>
+              <span className={styles.thumbnailHint}>クリックで拡大表示</span>
+            </a>
+          ) : null}
+
+          <dl className={styles.summaryGrid}>
+            <div>
+              <dt>動画URL</dt>
+              <dd>{script.url || "未取得"}</dd>
+            </div>
+            <div>
+              <dt>登録者数</dt>
+              <dd>{formatCount(script.subscribers)}</dd>
+            </div>
+            <div>
+              <dt>保存日時</dt>
+              <dd>{formatPublishedAt(script.createdAt)}</dd>
+            </div>
+            <div>
+              <dt>動画ID</dt>
+              <dd>{script.videoId || "未取得"}</dd>
+            </div>
+          </dl>
+        </div>
       </section>
 
       <section className={styles.contentCard}>
@@ -105,11 +173,30 @@ export default async function ScriptPage({ params, searchParams }: ScriptPagePro
 
         <div className={styles.sectionHeader}>
           <h2>{currentTitle}</h2>
-          <span>{currentText ? "保存済み" : "未取得"}</span>
+          <span>
+            {activeTab === "comments" && comments.length > 0
+              ? `${comments.length}件`
+              : currentText
+                ? "保存済み"
+                : "未取得"}
+          </span>
         </div>
-        <pre className={styles.preformatted}>
-          {currentText || `${activeTab === "comments" ? "コメント" : "台本"}は保存されていません。`}
-        </pre>
+        {activeTab === "comments" ? (
+          comments.length > 0 ? (
+            <div className={styles.commentList}>
+              {comments.map((comment, index) => (
+                <article key={`${comment.author}-${index}`} className={styles.commentCard}>
+                  <p className={styles.commentAuthor}>{comment.author || "投稿者不明"}</p>
+                  <p className={styles.commentText}>{comment.text}</p>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className={styles.emptyText}>コメントは保存されていません。</p>
+          )
+        ) : (
+          <pre className={styles.preformatted}>{currentText || "台本は保存されていません。"}</pre>
+        )}
       </section>
     </main>
   );

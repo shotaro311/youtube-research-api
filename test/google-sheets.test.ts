@@ -48,7 +48,7 @@ describe("buildAiExtractSheetRows", () => {
     ).toEqual([
       [
         "https://www.youtube.com/watch?v=abc123",
-        '=IMAGE("https://i.ytimg.com/vi/abc123/hqdefault.jpg")',
+        '=IMAGE("https://i.ytimg.com/vi/abc123/hqdefault.jpg",4,162,288)',
         "Test Title",
         1234,
         "2024-01-01T00:00:00Z",

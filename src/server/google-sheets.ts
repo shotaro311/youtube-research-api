@@ -14,6 +14,11 @@ const DEFAULT_SCRIPT_DB_SHEET_NAME = "台本DB";
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 const MAX_CELL_TEXT_LENGTH = 40000;
 const GOOGLE_CREDENTIALS_JSON_ENV = "GOOGLE_APPLICATION_CREDENTIALS_JSON";
+const THUMBNAIL_WIDTH_PX = 288;
+const THUMBNAIL_HEIGHT_PX = 162;
+const THUMBNAIL_COLUMN_WIDTH_PX = 304;
+const THUMBNAIL_ROW_HEIGHT_PX = 178;
+const THUMBNAIL_COLUMN_INDEX = 1;
 
 type SheetsExportPayload = {
   items: ExtractVideoResponse[];
@@ -163,6 +168,90 @@ function parseStoredMeta(
   }
 }
 
+function buildThumbnailFormula(thumbnailUrl?: string): string {
+  return thumbnailUrl ? `=IMAGE("${thumbnailUrl}",4,${THUMBNAIL_HEIGHT_PX},${THUMBNAIL_WIDTH_PX})` : "";
+}
+
+function parseUpdatedRowIndexes(updatedRange?: string): { startIndex: number; endIndex: number } | null {
+  if (!updatedRange) {
+    return null;
+  }
+
+  const match = updatedRange.match(/![A-Z]+(\d+)(?::[A-Z]+(\d+))?$/);
+  if (!match) {
+    return null;
+  }
+
+  const startRow = Number(match[1]);
+  const endRow = Number(match[2] ?? match[1]);
+  if (!Number.isInteger(startRow) || !Number.isInteger(endRow)) {
+    return null;
+  }
+
+  return {
+    startIndex: Math.max(0, startRow - 1),
+    endIndex: Math.max(startRow, endRow),
+  };
+}
+
+async function resizeAiExtractThumbnailArea(
+  sheets: Awaited<ReturnType<typeof createSheetsClient>>,
+  spreadsheetId: string,
+  updatedRange?: string,
+): Promise<void> {
+  const rowIndexes = parseUpdatedRowIndexes(updatedRange);
+  if (!rowIndexes) {
+    return;
+  }
+
+  const sheetName = getSheetName();
+  const sheetResponse = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets(properties(sheetId,title))",
+  });
+  const sheetId = sheetResponse.data.sheets?.find((sheet) => sheet.properties?.title === sheetName)?.properties?.sheetId;
+
+  if (typeof sheetId !== "number") {
+    throw new UpstreamServiceError("AI抽出シートが見つかりません。");
+  }
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          updateDimensionProperties: {
+            range: {
+              sheetId,
+              dimension: "ROWS",
+              startIndex: rowIndexes.startIndex,
+              endIndex: rowIndexes.endIndex,
+            },
+            properties: {
+              pixelSize: THUMBNAIL_ROW_HEIGHT_PX,
+            },
+            fields: "pixelSize",
+          },
+        },
+        {
+          updateDimensionProperties: {
+            range: {
+              sheetId,
+              dimension: "COLUMNS",
+              startIndex: THUMBNAIL_COLUMN_INDEX,
+              endIndex: THUMBNAIL_COLUMN_INDEX + 1,
+            },
+            properties: {
+              pixelSize: THUMBNAIL_COLUMN_WIDTH_PX,
+            },
+            fields: "pixelSize",
+          },
+        },
+      ],
+    },
+  });
+}
+
 export function buildAiExtractSheetRows(
   items: ExtractVideoResponse[],
   references: ScriptReference[] = [],
@@ -172,7 +261,7 @@ export function buildAiExtractSheetRows(
 
     return [
       item.rawData.url,
-      `=IMAGE("${item.rawData.thumbnailUrl}")`,
+      buildThumbnailFormula(item.rawData.thumbnailUrl),
       item.rawData.title,
       item.rawData.views,
       item.rawData.publishedAt,
@@ -266,13 +355,14 @@ export async function appendAiExtractRows(
   }
 
   const sheets = await createSheetsClient();
+  const spreadsheetId = getSpreadsheetId();
   const references = buildScriptReferences(payload.items, payload.viewerBaseUrl);
   const scriptRows = buildScriptDbRows(payload.items, references);
   const rows = buildAiExtractSheetRows(payload.items, references);
 
   if (scriptRows.length > 0) {
     await sheets.spreadsheets.values.append({
-      spreadsheetId: getSpreadsheetId(),
+      spreadsheetId,
       range: `${getScriptDbSheetName()}!A:H`,
       valueInputOption: "RAW",
       insertDataOption: "INSERT_ROWS",
@@ -282,8 +372,8 @@ export async function appendAiExtractRows(
     });
   }
 
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: getSpreadsheetId(),
+  const appendResponse = await sheets.spreadsheets.values.append({
+    spreadsheetId,
     range: `${getSheetName()}!A:K`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
@@ -291,6 +381,7 @@ export async function appendAiExtractRows(
       values: rows,
     },
   });
+  await resizeAiExtractThumbnailArea(sheets, spreadsheetId, appendResponse.data.updates?.updatedRange ?? undefined);
 
   return {
     appendedRows: rows.length,

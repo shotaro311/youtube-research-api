@@ -1,6 +1,6 @@
 import { execFile as execFileCb } from "child_process";
 import { existsSync } from "fs";
-import { readFile, mkdtemp, rm } from "fs/promises";
+import { readFile, mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { promisify } from "util";
@@ -705,10 +705,20 @@ async function fetchTranscriptFromYtDlp(videoId: string): Promise<TranscriptSegm
       "json3",
       "--js-runtimes",
       YT_DLP_JS_RUNTIME,
-      "-o",
-      outputTemplate,
-      `https://www.youtube.com/watch?v=${videoId}`,
     ];
+
+    const cookieText = process.env.YT_DLP_COOKIES_BASE64
+      ? Buffer.from(process.env.YT_DLP_COOKIES_BASE64, "base64").toString("utf-8")
+      : process.env.YT_DLP_COOKIES || process.env.YT_DLP_COOKIES_TEXT;
+    const cookiePath = process.env.YT_DLP_COOKIES_PATH || (cookieText ? join(tempDir, "cookies.txt") : null);
+    if (cookieText && cookiePath) {
+      await writeFile(cookiePath, cookieText, "utf-8");
+    }
+    if (cookiePath) {
+      args.push("--cookies", cookiePath);
+    }
+
+    args.push("-o", outputTemplate, `https://www.youtube.com/watch?v=${videoId}`);
 
     let execError: Error | null = null;
     try {

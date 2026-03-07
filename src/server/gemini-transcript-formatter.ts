@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { BadRequestError, UpstreamServiceError } from "../domain/youtube/errors";
 import type { FormattedTranscript, FormattedTranscriptSection } from "../domain/youtube/transcript-format";
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-3.1-flash-lite-preview";
 
 type TranscriptSource = {
   title: string;

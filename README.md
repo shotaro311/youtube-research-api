@@ -41,6 +41,7 @@ npm run verify
 
 - 必須環境変数は `YOUTUBE_API_KEY` です
 - 台本ビューアの `Geminiで整形` を使う場合は `GEMINI_API_KEY` も設定してください
+- 台本ビューアの `Geminiで整形` は `gemini-3.1-flash-lite-preview` を使います
 - `/` の主要文言・基調色・主要カード高さ・主要ボタン幅は `docs/sample/youtube-research-console.pen` をサーバー側で読み込んで反映します
 - 動画抽出カードでは、通常抽出に加えて `コメントのみ` ボタンから字幕なしのコメント抽出も行えます
 - 動画抽出カードでは、複数URLを改行区切りで貼り付けて一括抽出し、URLごとの結果カードを縦に並べて確認できます

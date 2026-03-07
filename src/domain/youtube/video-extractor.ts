@@ -206,6 +206,16 @@ function buildAcceptLanguage(language?: string): string {
   return language ? `${language},ja-JP;q=0.9,ja;q=0.8,en-US;q=0.7,en;q=0.6` : "ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7";
 }
 
+function buildWatchPageUrl(videoId: string): string {
+  const url = new URL("https://www.youtube.com/watch");
+  url.searchParams.set("v", videoId);
+  url.searchParams.set("hl", "ja");
+  url.searchParams.set("persist_hl", "1");
+  url.searchParams.set("bpctr", "9999999999");
+  url.searchParams.set("has_verified", "1");
+  return url.toString();
+}
+
 function toStringHeaders(source: unknown): Record<string, string> {
   if (!source || typeof source !== "object" || Array.isArray(source)) {
     return {};
@@ -229,6 +239,7 @@ function buildYouTubeRequestHeaders(
   return {
     Accept: "*/*",
     "Accept-Language": buildAcceptLanguage(language),
+    Cookie: "PREF=hl=ja&gl=JP; CONSENT=YES+cb.20210328-17-p0.en+FX",
     Origin: "https://www.youtube.com",
     Referer: `https://www.youtube.com/watch?v=${videoId}`,
     "User-Agent": userAgent,
@@ -578,7 +589,7 @@ async function fetchTranscriptFromTranscriptPlus(videoId: string): Promise<Trans
 
 async function fetchTranscriptFromWatchPage(videoId: string): Promise<TranscriptSegmentRow[]> {
   const fetchCore = async () => {
-    const watchResponse = await fetch(`https://www.youtube.com/watch?v=${videoId}&hl=ja`, {
+    const watchResponse = await fetch(buildWatchPageUrl(videoId), {
       headers: buildYouTubeRequestHeaders(videoId, DESKTOP_USER_AGENT, "ja"),
     });
     if (!watchResponse.ok) return [];
@@ -599,7 +610,7 @@ async function fetchTranscriptFromWatchPage(videoId: string): Promise<Transcript
 
 async function fetchTranscriptFromInnertubeAndroid(videoId: string): Promise<TranscriptSegmentRow[]> {
   const fetchCore = async () => {
-    const watchResponse = await fetch(`https://www.youtube.com/watch?v=${videoId}&hl=ja`, {
+    const watchResponse = await fetch(buildWatchPageUrl(videoId), {
       headers: buildYouTubeRequestHeaders(videoId, DESKTOP_USER_AGENT, "ja"),
     });
     if (!watchResponse.ok) return [];

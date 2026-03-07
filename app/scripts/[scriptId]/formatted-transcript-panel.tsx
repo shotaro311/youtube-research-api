@@ -56,7 +56,9 @@ export function FormattedTranscriptPanel({
         </button>
       </div>
 
-      <p className={styles.formattedNote}>元の保存内容は変えずに、区切りや見出しだけを整えます。</p>
+      <p className={styles.formattedNote}>
+        元の保存内容は変えずに、見出し追加と話者切り替わり付近の改行だけを整えます。
+      </p>
 
       {errorMessage ? <p className={styles.formatError}>{errorMessage}</p> : null}
 

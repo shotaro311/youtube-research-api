@@ -14,6 +14,7 @@ vi.mock("@google/genai", () => ({
     OBJECT: "OBJECT",
     ARRAY: "ARRAY",
     STRING: "STRING",
+    INTEGER: "INTEGER",
   },
 }));
 
@@ -28,14 +29,16 @@ beforeEach(() => {
 });
 
 describe("formatTranscriptWithGemini", () => {
-  it("returns structured sections from Gemini JSON output", async () => {
+  it("keeps the original transcript text and only inserts headings and blank lines", async () => {
     generateContentMock.mockResolvedValue({
       text: JSON.stringify({
         title: "整形済み台本",
         sections: [
           {
             heading: "導入",
-            body: "読みやすく整形した本文です。",
+            startLine: 1,
+            endLine: 3,
+            speakerBreakLines: [2],
           },
         ],
       }),
@@ -44,14 +47,45 @@ describe("formatTranscriptWithGemini", () => {
     await expect(
       formatTranscriptWithGemini({
         title: "テスト動画",
-        transcript: "これは元の台本です。",
+        transcript: "00:01 これは元の台本です。\n00:02 話者が切り替わります。\n00:03 そのまま続きます。",
       }),
     ).resolves.toEqual({
       title: "整形済み台本",
       sections: [
         {
           heading: "導入",
-          body: "読みやすく整形した本文です。",
+          body: "00:01 これは元の台本です。\n\n00:02 話者が切り替わります。\n00:03 そのまま続きます。",
+        },
+      ],
+    });
+  });
+
+  it("falls back to a single section when Gemini returns invalid ranges", async () => {
+    generateContentMock.mockResolvedValue({
+      text: JSON.stringify({
+        title: "整形済み台本",
+        sections: [
+          {
+            heading: "導入",
+            startLine: 2,
+            endLine: 2,
+            speakerBreakLines: [],
+          },
+        ],
+      }),
+    });
+
+    await expect(
+      formatTranscriptWithGemini({
+        title: "テスト動画",
+        transcript: "00:01 A\n00:02 B",
+      }),
+    ).resolves.toEqual({
+      title: "Gemini整形版",
+      sections: [
+        {
+          heading: "本文",
+          body: "00:01 A\n00:02 B",
         },
       ],
     });

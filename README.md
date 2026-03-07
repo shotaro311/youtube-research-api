@@ -52,7 +52,7 @@ npm run verify
 - Vercel では字幕抽出 API を `hnd1` 優先で動かし、日本リージョン寄りで YouTube 抽出の安定化を図ります
 - YouTube の bot check に当たる場合は、任意で `YT_DLP_COOKIES_PATH` または `YT_DLP_COOKIES_BASE64` を設定すると `yt-dlp` に cookies を渡せます
 - シート反映時は要約行を `AI抽出` に追記しつつ、字幕全文とコメント全文を `台本DB` に保存します。`AI抽出` の `台本` / `コメント` 列から `/scripts/[scriptId]` の閲覧ページを開け、同ページから JSON もダウンロードできます
-- `/scripts/[scriptId]` の台本タブでは `Geminiで整形` ボタンから、元の保存内容を変えずに見出しや区切りを整えた読みやすい表示を生成できます
+- `/scripts/[scriptId]` の台本タブでは `Geminiで整形` ボタンから、元の保存内容を変えずに見出し追加と話者切り替わり付近の改行を入れた表示を生成できます
 - 共有できる URL をシートへ書き込みたい場合は `SCRIPT_VIEWER_BASE_URL` に公開URLを設定してください。未設定時はリクエスト元 origin を使います
 - `.pen` を更新したら、開発中は画面を再読込、本番反映は再ビルドで同期されます
 - 詳細仕様は `docs/requirement/requirements.md` を参照してください

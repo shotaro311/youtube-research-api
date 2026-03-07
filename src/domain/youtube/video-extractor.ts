@@ -40,7 +40,10 @@ const TRANSCRIPT_PLUS_USER_AGENTS = [DESKTOP_USER_AGENT, DESKTOP_USER_AGENT_ALT]
 
 type CaptionTrack = {
   languageCode?: string;
-  baseUrl: string;
+  baseUrl?: string;
+  url?: string;
+  signatureCipher?: string;
+  cipher?: string;
 };
 
 type WatchPagePlayerResponse = {
@@ -246,6 +249,38 @@ function replaceTrackFormat(baseUrl: string, format: string): string {
   }
 }
 
+function resolveCaptionTrackUrl(track: CaptionTrack): string | null {
+  if (track.baseUrl) {
+    return track.baseUrl;
+  }
+
+  if (track.url) {
+    return track.url;
+  }
+
+  const cipher = track.signatureCipher || track.cipher;
+  if (!cipher) {
+    return null;
+  }
+
+  const params = new URLSearchParams(cipher);
+  const rawUrl = params.get("url");
+  if (!rawUrl || params.get("s")) {
+    return null;
+  }
+
+  try {
+    const url = new URL(rawUrl);
+    const signature = params.get("sig") || params.get("signature") || params.get("lsig");
+    if (signature) {
+      url.searchParams.set(params.get("sp") || "signature", signature);
+    }
+    return url.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
 function decodeCaptionText(text: string): string {
   return text
     .replace(/&#39;/g, "'")
@@ -398,11 +433,12 @@ async function fetchFirstAvailableTrackSegments(videoId: string, tracks: Caption
   let bestSegments: TranscriptSegmentRow[] = [];
 
   for (const track of sortedTracks) {
-    if (!track.baseUrl) continue;
+    const resolvedTrackUrl = resolveCaptionTrackUrl(track);
+    if (!resolvedTrackUrl) continue;
     try {
       const candidates = [
-        { url: replaceTrackFormat(track.baseUrl, "json3"), parser: parseJson3Subtitles },
-        { url: track.baseUrl, parser: parseCaptionXml },
+        { url: replaceTrackFormat(resolvedTrackUrl, "json3"), parser: parseJson3Subtitles },
+        { url: resolvedTrackUrl, parser: parseCaptionXml },
       ];
 
       for (const candidate of candidates) {

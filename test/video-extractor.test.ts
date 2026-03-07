@@ -322,4 +322,97 @@ describe("extractVideoResearchRaw transcript selection", () => {
       { stage: "watch-page", success: true },
     ]);
   });
+
+  it("resolves caption tracks exposed as signatureCipher", async () => {
+    getSubtitlesMock.mockResolvedValue([]);
+    fetchTranscriptMock.mockResolvedValue([]);
+
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+
+      if (url.startsWith("https://www.googleapis.com/youtube/v3/videos?")) {
+        return createJsonResponse({
+          items: [
+            {
+              snippet: {
+                title: "Test Video",
+                publishedAt: "2024-01-01T00:00:00Z",
+                channelTitle: "Test Channel",
+                channelId: "channel-1",
+              },
+              statistics: {
+                viewCount: "1234",
+              },
+              contentDetails: {
+                duration: "PT10M0S",
+              },
+            },
+          ],
+        });
+      }
+
+      if (url.startsWith("https://www.googleapis.com/youtube/v3/channels?")) {
+        return createJsonResponse({
+          items: [
+            {
+              snippet: {
+                publishedAt: "2020-01-01T00:00:00Z",
+              },
+              statistics: {
+                subscriberCount: "999",
+              },
+            },
+          ],
+        });
+      }
+
+      if (url.startsWith("https://www.youtube.com/watch?v=")) {
+        return {
+          ok: true,
+          text: async () =>
+            'var ytInitialPlayerResponse = {"captions":{"playerCaptionsTracklistRenderer":{"captionTracks":[{"languageCode":"ja","signatureCipher":"url=https%3A%2F%2Fexample.com%2Fapi%2Ftimedtext%3Fv%3Dtest123&sig=test-signature&sp=signature"}]}}};',
+        } as Response;
+      }
+
+      if (url.startsWith("https://example.com/api/timedtext") && url.includes("fmt=json3")) {
+        expect(url).toContain("signature=test-signature");
+        return {
+          ok: true,
+          text: async () =>
+            JSON.stringify({
+              events: [
+                { tStartMs: 0, segs: [{ utf8: "冒頭" }] },
+                { tStartMs: 120000, segs: [{ utf8: "中盤" }] },
+              ],
+            }),
+        } as Response;
+      }
+
+      if (url.startsWith("https://example.com/api/timedtext")) {
+        return {
+          ok: true,
+          text: async () => "",
+        } as Response;
+      }
+
+      throw new Error(`Unexpected fetch in test: ${url}`);
+    });
+
+    const result = await extractVideoResearchRaw({
+      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      includeComments: false,
+    });
+
+    expect(result.rawData.transcript).toEqual([
+      { time: "00:00", text: "冒頭" },
+      { time: "02:00", text: "中盤" },
+    ]);
+    expect(result.diagnostics.transcript).toEqual([
+      { stage: "yt-dlp", success: false, error: "No segments returned" },
+      { stage: "caption-extractor", success: false, error: "No segments returned" },
+      { stage: "transcript-plus", success: false, error: "No segments returned" },
+      { stage: "innertube-android", success: false, error: "No segments returned" },
+      { stage: "watch-page", success: true },
+    ]);
+  });
 });

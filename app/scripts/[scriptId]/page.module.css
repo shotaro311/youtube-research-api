@@ -149,19 +149,30 @@
   padding: 20px 22px;
 }
 
-.formattedPanel {
-  margin: 0 0 22px;
+.transcriptGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.transcriptCard {
   padding: 18px;
   border: 1px solid rgba(146, 178, 229, 0.16);
   border-radius: 20px;
   background: rgba(11, 29, 58, 0.62);
 }
 
-.formattedHeader {
+.transcriptCardHeader {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
-  align-items: center;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.transcriptCardTitle {
+  margin: 0;
+  font-size: 20px;
 }
 
 .formattedEyebrow {
@@ -169,11 +180,6 @@
   font-size: 12px;
   letter-spacing: 0.08em;
   color: #8bb8ff;
-}
-
-.formattedHeader h3 {
-  margin: 0;
-  font-size: 20px;
 }
 
 .formatButton {
@@ -351,7 +357,8 @@
   }
 
   .summaryLayout,
-  .summaryGrid {
+  .summaryGrid,
+  .transcriptGrid {
     grid-template-columns: 1fr;
   }
 
@@ -359,12 +366,12 @@
     min-width: 0;
   }
 
-  .formattedHeader {
+  .sectionHeader {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .sectionHeader {
+  .transcriptCardHeader {
     align-items: flex-start;
     flex-direction: column;
   }

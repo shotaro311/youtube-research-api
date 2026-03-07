@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { readStoredScript } from "../../../src/server/google-sheets";
 import { CopyContentButton } from "./copy-content-button";
-import { FormattedTranscriptPanel } from "./formatted-transcript-panel";
+import { TranscriptWorkspace } from "./formatted-transcript-panel";
 import styles from "./page.module.css";
 
 export const runtime = "nodejs";
@@ -173,38 +173,30 @@ export default async function ScriptPage({ params, searchParams }: ScriptPagePro
           </Link>
         </div>
 
-        <div className={styles.sectionHeader}>
-          <h2>{currentTitle}</h2>
-          <div className={styles.sectionHeaderActions}>
-            <span>
-              {activeTab === "comments" && comments.length > 0
-                ? `${comments.length}件`
-                : currentText
-                  ? "保存済み"
-                  : "未取得"}
-            </span>
-            <CopyContentButton
-              text={currentText}
-              idleLabel={activeTab === "comments" ? "コメントをコピー" : "台本をコピー"}
-            />
-          </div>
-        </div>
-        {activeTab === "transcript" ? <FormattedTranscriptPanel scriptId={script.scriptId} /> : null}
-        {activeTab === "comments" ? (
-          comments.length > 0 ? (
-            <div className={styles.commentList}>
-              {comments.map((comment, index) => (
-                <article key={`${comment.author}-${index}`} className={styles.commentCard}>
-                  <p className={styles.commentAuthor}>{comment.author || "投稿者不明"}</p>
-                  <p className={styles.commentText}>{comment.text}</p>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className={styles.emptyText}>コメントは保存されていません。</p>
-          )
+        {activeTab === "transcript" ? (
+          <TranscriptWorkspace scriptId={script.scriptId} originalText={script.transcript} />
         ) : (
-          <pre className={styles.preformatted}>{currentText || "台本は保存されていません。"}</pre>
+          <>
+            <div className={styles.sectionHeader}>
+              <h2>{currentTitle}</h2>
+              <div className={styles.sectionHeaderActions}>
+                <span>{comments.length > 0 ? `${comments.length}件` : currentText ? "保存済み" : "未取得"}</span>
+                <CopyContentButton text={currentText} idleLabel="コメントをコピー" />
+              </div>
+            </div>
+            {comments.length > 0 ? (
+              <div className={styles.commentList}>
+                {comments.map((comment, index) => (
+                  <article key={`${comment.author}-${index}`} className={styles.commentCard}>
+                    <p className={styles.commentAuthor}>{comment.author || "投稿者不明"}</p>
+                    <p className={styles.commentText}>{comment.text}</p>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className={styles.emptyText}>コメントは保存されていません。</p>
+            )}
+          </>
         )}
       </section>
     </main>

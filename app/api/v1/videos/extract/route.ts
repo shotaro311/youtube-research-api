@@ -3,6 +3,7 @@ import { readJsonBody, requireString, toErrorResponse } from "../../../../../src
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const preferredRegion = ["hnd1"];
 
 export async function POST(request: Request): Promise<Response> {
   try {

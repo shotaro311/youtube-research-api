@@ -10,3 +10,5 @@ coverage/
 gen-lang-client-*.json
 .serena/
 .vercel/
+.vercel
+.env*.local

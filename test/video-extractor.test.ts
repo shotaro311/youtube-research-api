@@ -155,6 +155,45 @@ describe("extractVideoResearchRaw transcript selection", () => {
     ]);
   });
 
+  it("retries transcript-plus with an alternate browser profile when the first one returns nothing", async () => {
+    getSubtitlesMock.mockResolvedValue([]);
+
+    const userAgents: string[] = [];
+    fetchTranscriptMock.mockImplementation(async (_videoId: string, options?: { lang?: string; userAgent?: string }) => {
+      userAgents.push(options?.userAgent || "missing");
+
+      if (options?.userAgent?.includes("Chrome/120")) {
+        return [];
+      }
+
+      if (options?.lang === "ja") {
+        return [
+          { offset: 0, text: "冒頭" },
+          { offset: 580, text: "終盤" },
+        ];
+      }
+
+      return [];
+    });
+
+    const result = await extractVideoResearchRaw({
+      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      includeComments: false,
+    });
+
+    expect(userAgents.some((value) => value.includes("Chrome/120"))).toBe(true);
+    expect(userAgents.some((value) => value.includes("Chrome/131"))).toBe(true);
+    expect(result.rawData.transcript).toEqual([
+      { time: "00:00", text: "冒頭" },
+      { time: "09:40", text: "終盤" },
+    ]);
+    expect(result.diagnostics.transcript).toEqual([
+      { stage: "yt-dlp", success: false, error: "No segments returned" },
+      { stage: "caption-extractor", success: false, error: "No segments returned" },
+      { stage: "transcript-plus", success: true },
+    ]);
+  });
+
   it("chooses the fullest transcript across languages inside the same stage", async () => {
     getSubtitlesMock.mockImplementation(async ({ lang }: { lang?: string }) => {
       if (lang === "ja") {

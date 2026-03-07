@@ -31,9 +31,12 @@ const YT_DLP_BINARY = process.env.YT_DLP_PATH || "yt-dlp";
 const YT_DLP_JS_RUNTIME = process.env.YT_DLP_JS_RUNTIME || "node";
 const DESKTOP_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const DESKTOP_USER_AGENT_ALT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 const ANDROID_USER_AGENT = "com.google.android.youtube/19.44.38 (Linux; U; Android 14) gzip";
 const ANDROID_CLIENT_VERSION = "19.44.38";
 const ANDROID_SDK_VERSION = 34;
+const TRANSCRIPT_PLUS_USER_AGENTS = [DESKTOP_USER_AGENT, DESKTOP_USER_AGENT_ALT];
 
 type CaptionTrack = {
   languageCode?: string;
@@ -196,6 +199,40 @@ function sortCaptionTracksByPreference(tracks: CaptionTrack[]): CaptionTrack[] {
   );
 }
 
+function buildAcceptLanguage(language?: string): string {
+  return language ? `${language},ja-JP;q=0.9,ja;q=0.8,en-US;q=0.7,en;q=0.6` : "ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7";
+}
+
+function toStringHeaders(source: unknown): Record<string, string> {
+  if (!source || typeof source !== "object" || Array.isArray(source)) {
+    return {};
+  }
+
+  const headers: Record<string, string> = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (typeof value === "string") {
+      headers[key] = value;
+    }
+  }
+  return headers;
+}
+
+function buildYouTubeRequestHeaders(
+  videoId: string,
+  userAgent: string,
+  language?: string,
+  extraHeaders: Record<string, string> = {},
+): Record<string, string> {
+  return {
+    Accept: "*/*",
+    "Accept-Language": buildAcceptLanguage(language),
+    Origin: "https://www.youtube.com",
+    Referer: `https://www.youtube.com/watch?v=${videoId}`,
+    "User-Agent": userAgent,
+    ...extraHeaders,
+  };
+}
+
 function replaceTrackFormat(baseUrl: string, format: string): string {
   try {
     const url = new URL(baseUrl);
@@ -356,7 +393,7 @@ function extractInnertubeWebApiKey(source: string): string | null {
   return match?.[1] || null;
 }
 
-async function fetchFirstAvailableTrackSegments(tracks: CaptionTrack[]): Promise<TranscriptSegmentRow[]> {
+async function fetchFirstAvailableTrackSegments(videoId: string, tracks: CaptionTrack[]): Promise<TranscriptSegmentRow[]> {
   const sortedTracks = sortCaptionTracksByPreference(tracks);
   let bestSegments: TranscriptSegmentRow[] = [];
 
@@ -370,9 +407,7 @@ async function fetchFirstAvailableTrackSegments(tracks: CaptionTrack[]): Promise
 
       for (const candidate of candidates) {
         const response = await fetch(candidate.url, {
-          headers: {
-            "User-Agent": DESKTOP_USER_AGENT,
-          },
+          headers: buildYouTubeRequestHeaders(videoId, DESKTOP_USER_AGENT),
         });
         if (!response.ok) continue;
 
@@ -390,6 +425,48 @@ async function fetchFirstAvailableTrackSegments(tracks: CaptionTrack[]): Promise
     }
   }
   return bestSegments;
+}
+
+function mapTranscriptPlusRows(rows: unknown): TranscriptSegmentRow[] {
+  return normalizeTranscriptSegments(
+    (Array.isArray(rows) ? rows : []).map((row) => ({
+      start: Number.isFinite((row as { offset?: unknown }).offset) ? Number((row as { offset: number }).offset) : 0,
+      text: typeof (row as { text?: unknown }).text === "string" ? (row as { text: string }).text : "",
+    })),
+  );
+}
+
+async function fetchTranscriptWithBrowserHeaders(
+  videoId: string,
+  language?: string,
+  userAgent = DESKTOP_USER_AGENT,
+): Promise<TranscriptSegmentRow[]> {
+  const rows = await fetchTranscript(videoId, {
+    ...(language ? { lang: language } : {}),
+    userAgent,
+    videoFetch: ({ url, lang, userAgent: requestUserAgent }) =>
+      fetch(url, {
+        headers: buildYouTubeRequestHeaders(videoId, requestUserAgent || userAgent, lang),
+      }),
+    playerFetch: ({ url, method, body, headers, lang, userAgent: requestUserAgent }) =>
+      fetch(url, {
+        method,
+        body,
+        headers: buildYouTubeRequestHeaders(videoId, requestUserAgent || userAgent, lang, {
+          ...toStringHeaders(headers),
+          "X-Youtube-Client-Name": "3",
+          "X-Youtube-Client-Version": ANDROID_CLIENT_VERSION,
+        }),
+      }),
+    transcriptFetch: ({ url, lang, userAgent: requestUserAgent }) =>
+      fetch(url, {
+        headers: buildYouTubeRequestHeaders(videoId, requestUserAgent || userAgent, lang),
+      }),
+  }).catch((error) => {
+    throw error instanceof Error ? error : new Error(String(error));
+  });
+
+  return mapTranscriptPlusRows(rows);
 }
 
 async function fetchTranscriptFromCaptionExtractor(videoId: string): Promise<TranscriptSegmentRow[]> {
@@ -427,29 +504,34 @@ async function fetchTranscriptFromCaptionExtractor(videoId: string): Promise<Tra
 async function fetchTranscriptFromTranscriptPlus(videoId: string): Promise<TranscriptSegmentRow[]> {
   const fetchCore = async () => {
     let bestSegments: TranscriptSegmentRow[] = [];
+    let lastError: Error | null = null;
 
-    for (const language of LANGUAGE_PREFERENCE) {
-      const rows = await fetchTranscript(videoId, { lang: language }).catch(() => []);
-      const segments = normalizeTranscriptSegments(
-        (Array.isArray(rows) ? rows : []).map((row) => ({
-          start: Number.isFinite((row as { offset?: unknown }).offset) ? Number((row as { offset: number }).offset) : 0,
-          text: typeof (row as { text?: unknown }).text === "string" ? (row as { text: string }).text : "",
-        })),
-      );
-      if (segments.length > 0 && compareTranscriptCandidates(segments, bestSegments) > 0) {
-        bestSegments = segments;
+    for (const userAgent of TRANSCRIPT_PLUS_USER_AGENTS) {
+      for (const language of LANGUAGE_PREFERENCE) {
+        const segments = await fetchTranscriptWithBrowserHeaders(videoId, language, userAgent).catch((error) => {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          return [];
+        });
+        if (segments.length > 0 && compareTranscriptCandidates(segments, bestSegments) > 0) {
+          bestSegments = segments;
+        }
+      }
+
+      const fallbackSegments = await fetchTranscriptWithBrowserHeaders(videoId, undefined, userAgent).catch((error) => {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        return [];
+      });
+      if (fallbackSegments.length > 0 && compareTranscriptCandidates(fallbackSegments, bestSegments) > 0) {
+        bestSegments = fallbackSegments;
+      }
+
+      if (bestSegments.length > 0) {
+        return bestSegments;
       }
     }
 
-    const fallbackRows = await fetchTranscript(videoId).catch(() => []);
-    const fallbackSegments = normalizeTranscriptSegments(
-      (Array.isArray(fallbackRows) ? fallbackRows : []).map((row) => ({
-        start: Number.isFinite((row as { offset?: unknown }).offset) ? Number((row as { offset: number }).offset) : 0,
-        text: typeof (row as { text?: unknown }).text === "string" ? (row as { text: string }).text : "",
-      })),
-    );
-    if (fallbackSegments.length > 0 && compareTranscriptCandidates(fallbackSegments, bestSegments) > 0) {
-      bestSegments = fallbackSegments;
+    if (lastError) {
+      throw lastError;
     }
 
     return bestSegments;
@@ -461,9 +543,7 @@ async function fetchTranscriptFromTranscriptPlus(videoId: string): Promise<Trans
 async function fetchTranscriptFromWatchPage(videoId: string): Promise<TranscriptSegmentRow[]> {
   const fetchCore = async () => {
     const watchResponse = await fetch(`https://www.youtube.com/watch?v=${videoId}&hl=ja`, {
-      headers: {
-        "User-Agent": DESKTOP_USER_AGENT,
-      },
+      headers: buildYouTubeRequestHeaders(videoId, DESKTOP_USER_AGENT, "ja"),
     });
     if (!watchResponse.ok) return [];
 
@@ -475,7 +555,7 @@ async function fetchTranscriptFromWatchPage(videoId: string): Promise<Transcript
     const parsed = JSON.parse(playerJson) as WatchPagePlayerResponse;
     const tracks = parsed.captions?.playerCaptionsTracklistRenderer?.captionTracks;
     if (!tracks || tracks.length === 0) return [];
-    return fetchFirstAvailableTrackSegments(tracks);
+    return fetchFirstAvailableTrackSegments(videoId, tracks);
   };
 
   return withTimeout(fetchCore(), TRANSCRIPT_FALLBACK_TIMEOUT_MS, "Transcript fallback fetch timed out");
@@ -484,9 +564,7 @@ async function fetchTranscriptFromWatchPage(videoId: string): Promise<Transcript
 async function fetchTranscriptFromInnertubeAndroid(videoId: string): Promise<TranscriptSegmentRow[]> {
   const fetchCore = async () => {
     const watchResponse = await fetch(`https://www.youtube.com/watch?v=${videoId}&hl=ja`, {
-      headers: {
-        "User-Agent": DESKTOP_USER_AGENT,
-      },
+      headers: buildYouTubeRequestHeaders(videoId, DESKTOP_USER_AGENT, "ja"),
     });
     if (!watchResponse.ok) return [];
 
@@ -496,10 +574,11 @@ async function fetchTranscriptFromInnertubeAndroid(videoId: string): Promise<Tra
 
     const playerResponse = await fetch(`https://www.youtube.com/youtubei/v1/player?key=${apiKey}&prettyPrint=false`, {
       method: "POST",
-      headers: {
+      headers: buildYouTubeRequestHeaders(videoId, ANDROID_USER_AGENT, "ja", {
         "Content-Type": "application/json",
-        "User-Agent": ANDROID_USER_AGENT,
-      },
+        "X-Youtube-Client-Name": "3",
+        "X-Youtube-Client-Version": ANDROID_CLIENT_VERSION,
+      }),
       body: JSON.stringify({
         context: {
           client: {
@@ -520,7 +599,7 @@ async function fetchTranscriptFromInnertubeAndroid(videoId: string): Promise<Tra
     const playerJson = (await playerResponse.json()) as InnertubePlayerResponse;
     const tracks = playerJson.captions?.playerCaptionsTracklistRenderer?.captionTracks;
     if (!tracks || tracks.length === 0) return [];
-    return fetchFirstAvailableTrackSegments(tracks);
+    return fetchFirstAvailableTrackSegments(videoId, tracks);
   };
 
   return withTimeout(fetchCore(), TRANSCRIPT_FALLBACK_TIMEOUT_MS, "Transcript android fallback fetch timed out");

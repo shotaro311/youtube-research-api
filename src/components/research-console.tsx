@@ -243,11 +243,12 @@ export function ResearchConsole({ design }: { design: PencilConsoleDesign }): Re
         const data = await readApiResponse<{
           appendedRows: number;
           storedScriptRows: number;
+          storedCommentRows: number;
           detailLinksEnabled: boolean;
         }>(response);
         const detailMessage = data.detailLinksEnabled ? "台本リンク付きで" : "台本本文を保存しつつ";
         setSheetMessage(
-          `${formatCount(data.appendedRows)}件を ${detailMessage} AI抽出 シートへ反映しました。台本DB には ${formatCount(data.storedScriptRows)} 行を追加しました。`,
+          `${formatCount(data.appendedRows)}件を ${detailMessage} AI抽出 シートへ反映しました。台本DB には ${formatCount(data.storedScriptRows)} 行、コメントDB には ${formatCount(data.storedCommentRows)} 行を追加しました。`,
         );
       } catch (error) {
         setSheetMessage(error instanceof Error ? error.message : "スプレッドシート反映に失敗しました");

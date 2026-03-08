@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildAiExtractSheetRows, buildScriptDbRows } from "../src/server/google-sheets";
+import { buildAiExtractSheetRows, buildCommentDbRows, buildScriptDbRows } from "../src/server/google-sheets";
 import type { ExtractVideoResponse } from "../src/domain/youtube/types";
 
 describe("buildAiExtractSheetRows", () => {
@@ -147,6 +147,88 @@ describe("buildScriptDbRows", () => {
         "comments",
         "0",
         "a: b",
+        "2026-03-07T00:00:00.000Z",
+      ],
+    ]);
+  });
+});
+
+describe("buildCommentDbRows", () => {
+  it("creates one row per comment for the comment database sheet", () => {
+    const items: ExtractVideoResponse[] = [
+      {
+        rawData: {
+          videoId: "abc123",
+          url: "https://www.youtube.com/watch?v=abc123",
+          thumbnailUrl: "https://i.ytimg.com/vi/abc123/hqdefault.jpg",
+          title: "Test Title",
+          channelId: "channel-1",
+          channelName: "Test Channel",
+          subscribers: 999,
+          channelCreatedAt: "2020-01-01T00:00:00Z",
+          publishedAt: "2024-01-01T00:00:00Z",
+          views: 1234,
+          duration: "PT10M",
+          transcript: [],
+          comments: [
+            { author: "a", text: "first", likes: 1 },
+            { author: "b", text: "second", likes: 2 },
+          ],
+        },
+        metadata: {
+          title: "Test Title",
+          thumbnailUrl: "https://i.ytimg.com/vi/abc123/hqdefault.jpg",
+          viewCount: "1234",
+          publishDate: "2024-01-01T00:00:00Z",
+          author: "Test Channel",
+        },
+        diagnostics: {
+          metadata: [{ stage: "data-api", success: true }],
+          transcript: [{ stage: "watch-page", success: true }],
+          comments: [{ stage: "innertube", success: true }],
+        },
+      },
+    ];
+
+    expect(
+      buildCommentDbRows(
+        items,
+        [
+          {
+            scriptId: "abc123-script",
+            transcriptUrl: "https://example.com/scripts/abc123-script?tab=transcript",
+            commentsUrl: "https://example.com/scripts/abc123-script?tab=comments",
+          },
+        ],
+        "2026-03-07T00:00:00.000Z",
+      ),
+    ).toEqual([
+      [
+        "abc123-script:1",
+        "abc123-script",
+        "abc123",
+        "https://www.youtube.com/watch?v=abc123",
+        "Test Title",
+        "Test Channel",
+        "2024-01-01T00:00:00Z",
+        1,
+        "a",
+        "first",
+        1,
+        "2026-03-07T00:00:00.000Z",
+      ],
+      [
+        "abc123-script:2",
+        "abc123-script",
+        "abc123",
+        "https://www.youtube.com/watch?v=abc123",
+        "Test Title",
+        "Test Channel",
+        "2024-01-01T00:00:00Z",
+        2,
+        "b",
+        "second",
+        2,
         "2026-03-07T00:00:00.000Z",
       ],
     ]);

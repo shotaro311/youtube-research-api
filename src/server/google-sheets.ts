@@ -12,6 +12,7 @@ const DEFAULT_CREDENTIALS_FILE = "gen-lang-client-0823751047-629dc32ab24d.json";
 const DEFAULT_SPREADSHEET_ID = "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME";
 const DEFAULT_SHEET_NAME = "AI抽出";
 const DEFAULT_SCRIPT_DB_SHEET_NAME = "台本DB";
+const DEFAULT_COMMENT_DB_SHEET_NAME = "コメントDB";
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 const MAX_CELL_TEXT_LENGTH = 40000;
 const GOOGLE_CREDENTIALS_JSON_ENV = "GOOGLE_APPLICATION_CREDENTIALS_JSON";
@@ -20,6 +21,20 @@ const THUMBNAIL_HEIGHT_PX = 162;
 const THUMBNAIL_COLUMN_WIDTH_PX = 304;
 const THUMBNAIL_ROW_HEIGHT_PX = 178;
 const THUMBNAIL_COLUMN_INDEX = 1;
+const COMMENT_DB_HEADER = [
+  "comment_id",
+  "script_id",
+  "video_id",
+  "video_url",
+  "title",
+  "channel_name",
+  "published_at",
+  "comment_index",
+  "author",
+  "comment_text",
+  "likes",
+  "created_at",
+] as const;
 
 type SheetsExportPayload = {
   items: ExtractVideoResponse[];
@@ -90,6 +105,10 @@ function getSheetName(): string {
 
 function getScriptDbSheetName(): string {
   return getConfiguredValue("GOOGLE_SHEETS_SCRIPT_DB_SHEET_NAME", DEFAULT_SCRIPT_DB_SHEET_NAME);
+}
+
+function getCommentDbSheetName(): string {
+  return getConfiguredValue("GOOGLE_SHEETS_COMMENT_DB_SHEET_NAME", DEFAULT_COMMENT_DB_SHEET_NAME);
 }
 
 function normalizeBaseUrl(value?: string): string {
@@ -209,6 +228,19 @@ function parseUpdatedRowIndexes(updatedRange?: string): { startIndex: number; en
   };
 }
 
+function toA1ColumnLabel(columnNumber: number): string {
+  let value = columnNumber;
+  let label = "";
+
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    label = String.fromCharCode(65 + remainder) + label;
+    value = Math.floor((value - 1) / 26);
+  }
+
+  return label;
+}
+
 async function resizeAiExtractThumbnailArea(
   sheets: Awaited<ReturnType<typeof createSheetsClient>>,
   spreadsheetId: string,
@@ -283,6 +315,71 @@ async function getSheetIdByTitle(
   }
 
   return sheetId;
+}
+
+async function ensureSheetWithHeader(
+  sheets: Awaited<ReturnType<typeof createSheetsClient>>,
+  spreadsheetId: string,
+  title: string,
+  header: readonly string[],
+): Promise<void> {
+  const metadata = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets(properties(sheetId,title))",
+  });
+  const existingSheet = metadata.data.sheets?.find((sheet) => sheet.properties?.title === title);
+
+  if (!existingSheet) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title,
+                gridProperties: {
+                  rowCount: 1000,
+                  columnCount: header.length,
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${title}!A1:${toA1ColumnLabel(header.length)}1`,
+      valueInputOption: "RAW",
+      requestBody: {
+        values: [Array.from(header)],
+      },
+    });
+    return;
+  }
+
+  const headerRange = `${title}!A1:${toA1ColumnLabel(header.length)}1`;
+  const headerResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: headerRange,
+  });
+  const existingHeader = headerResponse.data.values?.[0] ?? [];
+  const hasAnyHeaderValue = existingHeader.some((value) => typeof value === "string" && value.trim().length > 0);
+
+  if (hasAnyHeaderValue) {
+    return;
+  }
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: headerRange,
+    valueInputOption: "RAW",
+    requestBody: {
+      values: [Array.from(header)],
+    },
+  });
 }
 
 function buildStoredContentRows(
@@ -418,6 +515,34 @@ export function buildScriptDbRows(
   });
 }
 
+export function buildCommentDbRows(
+  items: ExtractVideoResponse[],
+  references: ScriptReference[],
+  createdAt = new Date().toISOString(),
+): Array<Array<string | number>> {
+  return items.flatMap((item, index) => {
+    const reference = references[index];
+    if (!reference) {
+      return [];
+    }
+
+    return item.rawData.comments.map((comment, commentIndex) => [
+      `${reference.scriptId}:${commentIndex + 1}`,
+      reference.scriptId,
+      item.rawData.videoId,
+      item.rawData.url,
+      item.rawData.title,
+      item.rawData.channelName,
+      item.rawData.publishedAt,
+      commentIndex + 1,
+      comment.author,
+      comment.text,
+      comment.likes,
+      createdAt,
+    ]);
+  });
+}
+
 async function createSheetsClient() {
   const credentialsJson = normalizeEnvValue(process.env[GOOGLE_CREDENTIALS_JSON_ENV]);
   const auth = credentialsJson
@@ -442,7 +567,12 @@ async function createSheetsClient() {
 
 export async function appendAiExtractRows(
   payload: SheetsExportPayload,
-): Promise<{ appendedRows: number; storedScriptRows: number; detailLinksEnabled: boolean }> {
+): Promise<{
+  appendedRows: number;
+  storedScriptRows: number;
+  storedCommentRows: number;
+  detailLinksEnabled: boolean;
+}> {
   if (!Array.isArray(payload.items) || payload.items.length === 0) {
     throw new BadRequestError("items is required");
   }
@@ -451,6 +581,7 @@ export async function appendAiExtractRows(
   const spreadsheetId = getSpreadsheetId();
   const references = buildScriptReferences(payload.items, payload.viewerBaseUrl);
   const scriptRows = buildScriptDbRows(payload.items, references);
+  const commentRows = buildCommentDbRows(payload.items, references);
   const rows = buildAiExtractSheetRows(payload.items, references);
 
   if (scriptRows.length > 0) {
@@ -461,6 +592,20 @@ export async function appendAiExtractRows(
       insertDataOption: "INSERT_ROWS",
       requestBody: {
         values: scriptRows,
+      },
+    });
+  }
+
+  if (commentRows.length > 0) {
+    const commentDbSheetName = getCommentDbSheetName();
+    await ensureSheetWithHeader(sheets, spreadsheetId, commentDbSheetName, COMMENT_DB_HEADER);
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${commentDbSheetName}!A:L`,
+      valueInputOption: "RAW",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: {
+        values: commentRows,
       },
     });
   }
@@ -479,6 +624,7 @@ export async function appendAiExtractRows(
   return {
     appendedRows: rows.length,
     storedScriptRows: scriptRows.length,
+    storedCommentRows: commentRows.length,
     detailLinksEnabled: references.some(
       (reference) => Boolean(reference.transcriptUrl) && Boolean(reference.commentsUrl),
     ),

@@ -568,3 +568,13 @@ export async function saveStoredCommentAnalysis(scriptId: string, analysis: Comm
     },
   });
 }
+
+export async function deleteStoredCommentAnalysis(scriptId: string): Promise<void> {
+  if (!scriptId) {
+    throw new BadRequestError("scriptId is required");
+  }
+
+  const sheets = await createSheetsClient();
+  const spreadsheetId = getSpreadsheetId();
+  await deleteScriptRowsByType(sheets, spreadsheetId, scriptId, "comment_analysis");
+}

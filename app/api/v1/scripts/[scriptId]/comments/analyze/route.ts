@@ -1,7 +1,11 @@
 import { normalizeCommentAnalysis, type CommentAnalysis, type CommentSentiment } from "../../../../../../../src/domain/youtube/comment-analysis";
 import { parseStoredComments } from "../../../../../../../src/domain/youtube/stored-comment";
 import { analyzeCommentsWithGemini } from "../../../../../../../src/server/gemini-comment-analyzer";
-import { readStoredScript, saveStoredCommentAnalysis } from "../../../../../../../src/server/google-sheets";
+import {
+  deleteStoredCommentAnalysis,
+  readStoredScript,
+  saveStoredCommentAnalysis,
+} from "../../../../../../../src/server/google-sheets";
 import { readJsonBody, toErrorResponse } from "../../../../../../../src/server/route-utils";
 import { BadRequestError } from "../../../../../../../src/domain/youtube/errors";
 
@@ -112,6 +116,23 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     await saveStoredCommentAnalysis(scriptId, analysis);
 
     return Response.json(analysis);
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function DELETE(_request: Request, context: RouteContext): Promise<Response> {
+  try {
+    const { scriptId } = await context.params;
+    const script = await readStoredScript(scriptId);
+
+    if (!script) {
+      return Response.json({ error: "script not found" }, { status: 404 });
+    }
+
+    await deleteStoredCommentAnalysis(scriptId);
+
+    return Response.json({ ok: true });
   } catch (error) {
     return toErrorResponse(error);
   }

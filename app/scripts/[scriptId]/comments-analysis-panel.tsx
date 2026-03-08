@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { CSSProperties } from "react";
 
 import {
@@ -80,6 +80,14 @@ function buildRatioCardStyle(rgb: string, value: number): CSSProperties {
     borderColor: `rgba(${rgb}, ${Math.min(strong + 0.18, 0.72)})`,
     boxShadow: `inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 22px rgba(${rgb}, 0.08)`,
   };
+}
+
+function getFilterLabel(filter: CommentFilter): string {
+  if (filter === "all") {
+    return "すべて";
+  }
+
+  return getSentimentLabel(filter);
 }
 
 function parseThemeLines(value: string): string[] {
@@ -213,6 +221,7 @@ export function CommentsWorkspace({
   comments,
   initialAnalysis = null,
 }: CommentsWorkspaceProps): React.JSX.Element {
+  const commentListRef = useRef<HTMLElement | null>(null);
   const [analysis, setAnalysis] = useState<CommentAnalysis | null>(
     initialAnalysis ? normalizeCommentAnalysis(initialAnalysis) : null,
   );
@@ -233,18 +242,12 @@ export function CommentsWorkspace({
 
   useEffect(() => {
     const stored = parseStoredState(window.localStorage.getItem(getCommentAnalysisStorageKey(scriptId)));
-    if (stored) {
-      setAnalysis(stored.analysis);
-      setDraftAnalysis(null);
-      setIsSummaryExpanded(stored.isSummaryExpanded);
-      setActiveFilter(stored.activeFilter);
-      return;
-    }
+    const normalizedInitialAnalysis = initialAnalysis ? normalizeCommentAnalysis(initialAnalysis) : null;
 
-    setAnalysis(initialAnalysis ? normalizeCommentAnalysis(initialAnalysis) : null);
+    setAnalysis(normalizedInitialAnalysis ?? stored?.analysis ?? null);
     setDraftAnalysis(null);
-    setIsSummaryExpanded(true);
-    setActiveFilter("all");
+    setIsSummaryExpanded(stored?.isSummaryExpanded ?? true);
+    setActiveFilter(stored?.activeFilter ?? "all");
   }, [initialAnalysis, scriptId]);
 
   const displayAnalysis = useMemo(
@@ -264,6 +267,21 @@ export function CommentsWorkspace({
       // ignore storage errors
     }
   }, [activeFilter, displayAnalysis, isSummaryExpanded, scriptId]);
+
+  const applyFilter = (nextFilter: CommentFilter, shouldScroll = false) => {
+    setActiveFilter(nextFilter);
+
+    if (!shouldScroll) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      commentListRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  };
 
   const persistAnalysis = async (nextAnalysis: CommentAnalysis) => {
     setIsSaving(true);
@@ -391,6 +409,49 @@ export function CommentsWorkspace({
     });
   };
 
+  const handleDeleteAnalysis = async () => {
+    if (!displayAnalysis) {
+      return;
+    }
+
+    const shouldDelete = window.confirm("保存済みのコメント分析結果を削除します。よろしいですか？");
+    if (!shouldDelete) {
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMessage("");
+    setSaveMessage("");
+
+    try {
+      const response = await fetch(`/api/v1/scripts/${scriptId}/comments/analyze`, {
+        method: "DELETE",
+      });
+      const body = (await response.json().catch(() => ({}))) as { error?: string };
+
+      if (!response.ok) {
+        setErrorMessage(body.error || "コメント分析の削除に失敗しました。");
+        return;
+      }
+
+      setAnalysis(null);
+      setDraftAnalysis(null);
+      setIsSummaryEditing(false);
+      setEditingCommentIndex(null);
+      setActiveFilter("all");
+      try {
+        window.localStorage.removeItem(getCommentAnalysisStorageKey(scriptId));
+      } catch {
+        // ignore storage errors
+      }
+      showSaveMessage("分析結果を削除しました");
+    } catch {
+      setErrorMessage("コメント分析の削除に失敗しました。");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const startSummaryEdit = () => {
     if (!displayAnalysis) {
       return;
@@ -486,6 +547,14 @@ export function CommentsWorkspace({
                 </button>
                 <button
                   type="button"
+                  onClick={() => void handleDeleteAnalysis()}
+                  disabled={isSaving}
+                  className={`${styles.iconButton} ${styles.dangerButton}`}
+                >
+                  削除
+                </button>
+                <button
+                  type="button"
                   onClick={() => setIsSummaryExpanded((current) => !current)}
                   className={styles.copyButton}
                 >
@@ -517,27 +586,45 @@ export function CommentsWorkspace({
                 </section>
 
                 <section className={styles.analysisRatioList}>
-                  <article
+                  <button
+                    type="button"
                     className={`${styles.analysisRatioCard} ${styles.analysisRatioPositive}`}
                     style={buildRatioCardStyle("90, 214, 142", displayAnalysis.positivePercent)}
+                    onClick={() => applyFilter("positive", true)}
                   >
-                    <p>ポジティブ</p>
+                    <span className={styles.analysisRatioLabelRow}>
+                      <span className={`${styles.filterIcon} ${styles.filterIconPositive}`} aria-hidden="true" />
+                      <span>ポジティブ</span>
+                    </span>
                     <strong>{displayAnalysis.positivePercent}%</strong>
-                  </article>
-                  <article
+                    <span className={styles.analysisRatioMeta}>{filterCounts.positive}件を見る</span>
+                  </button>
+                  <button
+                    type="button"
                     className={`${styles.analysisRatioCard} ${styles.analysisRatioNeutral}`}
                     style={buildRatioCardStyle("146, 178, 229", displayAnalysis.neutralPercent)}
+                    onClick={() => applyFilter("neutral", true)}
                   >
-                    <p>中立</p>
+                    <span className={styles.analysisRatioLabelRow}>
+                      <span className={`${styles.filterIcon} ${styles.filterIconNeutral}`} aria-hidden="true" />
+                      <span>中立</span>
+                    </span>
                     <strong>{displayAnalysis.neutralPercent}%</strong>
-                  </article>
-                  <article
+                    <span className={styles.analysisRatioMeta}>{filterCounts.neutral}件を見る</span>
+                  </button>
+                  <button
+                    type="button"
                     className={`${styles.analysisRatioCard} ${styles.analysisRatioNegative}`}
                     style={buildRatioCardStyle("255, 125, 125", displayAnalysis.negativePercent)}
+                    onClick={() => applyFilter("negative", true)}
                   >
-                    <p>ネガティブ</p>
+                    <span className={styles.analysisRatioLabelRow}>
+                      <span className={`${styles.filterIcon} ${styles.filterIconNegative}`} aria-hidden="true" />
+                      <span>ネガティブ</span>
+                    </span>
                     <strong>{displayAnalysis.negativePercent}%</strong>
-                  </article>
+                    <span className={styles.analysisRatioMeta}>{filterCounts.negative}件を見る</span>
+                  </button>
                 </section>
 
                 <section className={styles.analysisSectionCard}>
@@ -660,36 +747,52 @@ export function CommentsWorkspace({
             <div className={styles.filterChipGroup}>
               <button
                 type="button"
-                onClick={() => setActiveFilter("all")}
+                onClick={() => applyFilter("all", true)}
                 className={`${styles.filterChip} ${activeFilter === "all" ? styles.filterChipActive : ""}`}
+                aria-label="すべてのコメントへ切り替え"
               >
-                すべて {filterCounts.all}
+                <span className={`${styles.filterIcon} ${styles.filterIconAll}`} aria-hidden="true" />
+                <span className={styles.filterChipText}>
+                  {getFilterLabel("all")} {filterCounts.all}
+                </span>
               </button>
               <button
                 type="button"
-                onClick={() => setActiveFilter("positive")}
+                onClick={() => applyFilter("positive", true)}
                 className={`${styles.filterChip} ${activeFilter === "positive" ? styles.filterChipActive : ""}`}
+                aria-label="ポジティブのコメントへ切り替え"
               >
-                ポジティブ {filterCounts.positive}
+                <span className={`${styles.filterIcon} ${styles.filterIconPositive}`} aria-hidden="true" />
+                <span className={styles.filterChipText}>
+                  {getFilterLabel("positive")} {filterCounts.positive}
+                </span>
               </button>
               <button
                 type="button"
-                onClick={() => setActiveFilter("neutral")}
+                onClick={() => applyFilter("neutral", true)}
                 className={`${styles.filterChip} ${activeFilter === "neutral" ? styles.filterChipActive : ""}`}
+                aria-label="中立のコメントへ切り替え"
               >
-                中立 {filterCounts.neutral}
+                <span className={`${styles.filterIcon} ${styles.filterIconNeutral}`} aria-hidden="true" />
+                <span className={styles.filterChipText}>
+                  {getFilterLabel("neutral")} {filterCounts.neutral}
+                </span>
               </button>
               <button
                 type="button"
-                onClick={() => setActiveFilter("negative")}
+                onClick={() => applyFilter("negative", true)}
                 className={`${styles.filterChip} ${activeFilter === "negative" ? styles.filterChipActive : ""}`}
+                aria-label="ネガティブのコメントへ切り替え"
               >
-                ネガティブ {filterCounts.negative}
+                <span className={`${styles.filterIcon} ${styles.filterIconNegative}`} aria-hidden="true" />
+                <span className={styles.filterChipText}>
+                  {getFilterLabel("negative")} {filterCounts.negative}
+                </span>
               </button>
             </div>
           </div>
 
-          <section className={styles.analysisCommentList}>
+          <section ref={commentListRef} className={styles.analysisCommentList}>
             {filteredItems.map((item) => {
               const comment = comments[item.commentIndex - 1];
               const isEditingThis = editingCommentIndex === item.commentIndex && draftAnalysis !== null;

@@ -14,6 +14,7 @@ const DEFAULT_SPREADSHEET_ID = "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME";
 const DEFAULT_SHEET_NAME = "AI抽出";
 const DEFAULT_SCRIPT_DB_SHEET_NAME = "台本DB";
 const DEFAULT_COMMENT_DB_SHEET_NAME = "コメントDB";
+const DEFAULT_COMMENT_SHEET_NAME = "コメントシート";
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 const MAX_CELL_TEXT_LENGTH = 40000;
 const GOOGLE_CREDENTIALS_JSON_ENV = "GOOGLE_APPLICATION_CREDENTIALS_JSON";
@@ -40,6 +41,19 @@ const COMMENT_DB_HEADER = [
   "psychology",
   "note",
   "analysis_updated_at",
+] as const;
+const COMMENT_SHEET_HEADER = [
+  "コメントID",
+  "動画タイトル",
+  "動画リンク",
+  "チャンネル名",
+  "投稿者",
+  "コメント本文",
+  "感情タグ",
+  "視聴者像",
+  "心理",
+  "個別フィードバック",
+  "分析更新日時",
 ] as const;
 
 type SheetsExportPayload = {
@@ -115,6 +129,10 @@ function getScriptDbSheetName(): string {
 
 function getCommentDbSheetName(): string {
   return getConfiguredValue("GOOGLE_SHEETS_COMMENT_DB_SHEET_NAME", DEFAULT_COMMENT_DB_SHEET_NAME);
+}
+
+function getCommentSheetName(): string {
+  return getConfiguredValue("GOOGLE_SHEETS_COMMENT_SHEET_NAME", DEFAULT_COMMENT_SHEET_NAME);
 }
 
 function normalizeBaseUrl(value?: string): string {
@@ -446,6 +464,8 @@ type StoredCommentDbComment = {
   likes?: number;
 };
 
+type StoredCommentSheetBase = Pick<StoredCommentDbBase, "scriptId" | "url" | "title" | "channelName">;
+
 type StoredCommentAnalysisValues = {
   sentiment?: string;
   viewerType?: string;
@@ -453,6 +473,10 @@ type StoredCommentAnalysisValues = {
   note?: string;
   analysisUpdatedAt?: string;
 };
+
+function buildCommentId(scriptId: string, commentIndex: number): string {
+  return `${scriptId}:${commentIndex}`;
+}
 
 function buildCommentAnalysisCells(values?: StoredCommentAnalysisValues): Array<string | number> {
   return [
@@ -471,7 +495,7 @@ function buildStoredCommentDbRow(
   analysisValues?: StoredCommentAnalysisValues,
 ): Array<string | number> {
   return [
-    `${script.scriptId}:${commentIndex}`,
+    buildCommentId(script.scriptId, commentIndex),
     script.scriptId,
     script.videoId,
     script.url,
@@ -483,6 +507,23 @@ function buildStoredCommentDbRow(
     comment.text,
     typeof comment.likes === "number" ? comment.likes : "",
     script.createdAt,
+    ...buildCommentAnalysisCells(analysisValues),
+  ];
+}
+
+function buildStoredCommentSheetRow(
+  script: StoredCommentSheetBase,
+  comment: StoredCommentDbComment,
+  commentIndex: number,
+  analysisValues?: StoredCommentAnalysisValues,
+): Array<string | number> {
+  return [
+    buildCommentId(script.scriptId, commentIndex),
+    script.title,
+    script.url,
+    script.channelName ?? "",
+    comment.author,
+    comment.text,
     ...buildCommentAnalysisCells(analysisValues),
   ];
 }
@@ -631,6 +672,31 @@ export function buildCommentDbRows(
   });
 }
 
+export function buildCommentSheetRows(
+  items: ExtractVideoResponse[],
+  references: ScriptReference[],
+): Array<Array<string | number>> {
+  return items.flatMap((item, index) => {
+    const reference = references[index];
+    if (!reference) {
+      return [];
+    }
+
+    return item.rawData.comments.map((comment, commentIndex) =>
+      buildStoredCommentSheetRow(
+        {
+          scriptId: reference.scriptId,
+          url: item.rawData.url,
+          title: item.rawData.title,
+          channelName: item.rawData.channelName,
+        },
+        comment,
+        commentIndex + 1,
+      ),
+    );
+  });
+}
+
 function buildCommentAnalysisMap(analysis: CommentAnalysis, updatedAt: string): Map<number, StoredCommentAnalysisValues> {
   return new Map(
     analysis.items.map((item) => [
@@ -644,6 +710,14 @@ function buildCommentAnalysisMap(analysis: CommentAnalysis, updatedAt: string): 
       },
     ]),
   );
+}
+
+function parseCommentIndexFromId(commentId: string, scriptId: string): number {
+  if (!commentId.startsWith(`${scriptId}:`)) {
+    return 0;
+  }
+
+  return Number(commentId.slice(`${scriptId}:`.length));
 }
 
 async function syncCommentAnalysisToCommentDb(
@@ -739,6 +813,102 @@ async function clearCommentAnalysisFromCommentDb(
   }
 }
 
+async function syncCommentAnalysisToCommentSheet(
+  sheets: Awaited<ReturnType<typeof createSheetsClient>>,
+  spreadsheetId: string,
+  script: StoredCommentSheetBase,
+  comments: StoredCommentDbComment[],
+  analysis: CommentAnalysis,
+): Promise<void> {
+  const commentSheetName = getCommentSheetName();
+  await ensureSheetWithHeader(sheets, spreadsheetId, commentSheetName, COMMENT_SHEET_HEADER);
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${commentSheetName}!A:K`,
+  });
+  const rows = response.data.values ?? [];
+  const analysisUpdatedAt = new Date().toISOString();
+  const analysisMap = buildCommentAnalysisMap(analysis, analysisUpdatedAt);
+  const existingRows = rows
+    .map((row, index) => ({ row, rowNumber: index + 1 }))
+    .filter((entry) => entry.rowNumber > 1 && typeof entry.row[0] === "string" && entry.row[0].startsWith(`${script.scriptId}:`));
+
+  for (const entry of existingRows) {
+    const commentIndex = parseCommentIndexFromId(String(entry.row[0] ?? ""), script.scriptId);
+    const values = buildCommentAnalysisCells(analysisMap.get(commentIndex));
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${commentSheetName}!G${entry.rowNumber}:K${entry.rowNumber}`,
+      valueInputOption: "RAW",
+      requestBody: {
+        values: [values],
+      },
+    });
+  }
+
+  const existingCommentIndexes = new Set(
+    existingRows
+      .map((entry) => parseCommentIndexFromId(String(entry.row[0] ?? ""), script.scriptId))
+      .filter((commentIndex) => Number.isInteger(commentIndex) && commentIndex > 0),
+  );
+  const missingRows = comments.flatMap((comment, index) => {
+    const commentIndex = index + 1;
+    if (existingCommentIndexes.has(commentIndex)) {
+      return [];
+    }
+
+    return [buildStoredCommentSheetRow(script, comment, commentIndex, analysisMap.get(commentIndex))];
+  });
+
+  if (missingRows.length > 0) {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${commentSheetName}!A:K`,
+      valueInputOption: "RAW",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: {
+        values: missingRows,
+      },
+    });
+  }
+}
+
+async function clearCommentAnalysisFromCommentSheet(
+  sheets: Awaited<ReturnType<typeof createSheetsClient>>,
+  spreadsheetId: string,
+  scriptId: string,
+): Promise<void> {
+  const commentSheetName = getCommentSheetName();
+  await ensureSheetWithHeader(sheets, spreadsheetId, commentSheetName, COMMENT_SHEET_HEADER);
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${commentSheetName}!A:K`,
+  });
+  const rows = response.data.values ?? [];
+  const matchingRowNumbers = rows
+    .map((row, index) => ({ row, rowNumber: index + 1 }))
+    .filter(
+      (entry) =>
+        entry.rowNumber > 1 &&
+        typeof entry.row[0] === "string" &&
+        entry.row[0].startsWith(`${scriptId}:`),
+    )
+    .map((entry) => entry.rowNumber);
+
+  for (const rowNumber of matchingRowNumbers) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${commentSheetName}!G${rowNumber}:K${rowNumber}`,
+      valueInputOption: "RAW",
+      requestBody: {
+        values: [["", "", "", "", ""]],
+      },
+    });
+  }
+}
+
 async function createSheetsClient() {
   const credentialsJson = normalizeEnvValue(process.env[GOOGLE_CREDENTIALS_JSON_ENV]);
   const auth = credentialsJson
@@ -767,6 +937,7 @@ export async function appendAiExtractRows(
   appendedRows: number;
   storedScriptRows: number;
   storedCommentRows: number;
+  storedCommentSheetRows: number;
   detailLinksEnabled: boolean;
 }> {
   if (!Array.isArray(payload.items) || payload.items.length === 0) {
@@ -778,6 +949,7 @@ export async function appendAiExtractRows(
   const references = buildScriptReferences(payload.items, payload.viewerBaseUrl);
   const scriptRows = buildScriptDbRows(payload.items, references);
   const commentRows = buildCommentDbRows(payload.items, references);
+  const commentSheetRows = buildCommentSheetRows(payload.items, references);
   const rows = buildAiExtractSheetRows(payload.items, references);
 
   if (scriptRows.length > 0) {
@@ -806,6 +978,20 @@ export async function appendAiExtractRows(
     });
   }
 
+  if (commentSheetRows.length > 0) {
+    const commentSheetName = getCommentSheetName();
+    await ensureSheetWithHeader(sheets, spreadsheetId, commentSheetName, COMMENT_SHEET_HEADER);
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${commentSheetName}!A:K`,
+      valueInputOption: "RAW",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: {
+        values: commentSheetRows,
+      },
+    });
+  }
+
   const appendResponse = await sheets.spreadsheets.values.append({
     spreadsheetId,
     range: `${getSheetName()}!A:K`,
@@ -821,6 +1007,7 @@ export async function appendAiExtractRows(
     appendedRows: rows.length,
     storedScriptRows: scriptRows.length,
     storedCommentRows: commentRows.length,
+    storedCommentSheetRows: commentSheetRows.length,
     detailLinksEnabled: references.some(
       (reference) => Boolean(reference.transcriptUrl) && Boolean(reference.commentsUrl),
     ),
@@ -937,6 +1124,18 @@ export async function saveStoredCommentAnalysis(scriptId: string, analysis: Comm
     comments,
     analysis,
   );
+  await syncCommentAnalysisToCommentSheet(
+    sheets,
+    spreadsheetId,
+    {
+      scriptId,
+      url: metaRow[2] ?? "",
+      title: metaRow[3] ?? "",
+      channelName: metadata.channelName,
+    },
+    comments,
+    analysis,
+  );
 }
 
 export async function deleteStoredCommentAnalysis(scriptId: string): Promise<void> {
@@ -948,4 +1147,5 @@ export async function deleteStoredCommentAnalysis(scriptId: string): Promise<voi
   const spreadsheetId = getSpreadsheetId();
   await deleteScriptRowsByType(sheets, spreadsheetId, scriptId, "comment_analysis");
   await clearCommentAnalysisFromCommentDb(sheets, spreadsheetId, scriptId);
+  await clearCommentAnalysisFromCommentSheet(sheets, spreadsheetId, scriptId);
 }

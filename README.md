@@ -42,7 +42,9 @@ npm run verify
 - 必須環境変数は `YOUTUBE_API_KEY` です
 - 台本ビューアの `AI校正` を使う場合は `GEMINI_API_KEY` も設定してください
 - 台本ビューアの `AI校正` は `gemini-3.1-flash-lite-preview` を使います
+- コメントタブの `コメント分析` も `gemini-3.1-flash-lite-preview` を使います
 - `/` の主要文言・基調色・主要カード高さ・主要ボタン幅は `docs/sample/youtube-research-console.pen` をサーバー側で読み込んで反映します
+- `/` の左右カードでは、主要操作ボタンを各入力URL欄の上に配置しています
 - 動画抽出カードでは、通常抽出に加えて `コメントのみ` ボタンから字幕なしのコメント抽出も行えます
 - 動画抽出カードでは、複数URLを改行区切りで貼り付けて一括抽出し、URLごとの結果カードを縦に並べて確認できます
 - 抽出結果カードは初期状態ではタイトルとURLだけを表示し、開くと詳細を確認できます
@@ -53,6 +55,7 @@ npm run verify
 - YouTube の bot check に当たる場合は、任意で `YT_DLP_COOKIES_PATH` または `YT_DLP_COOKIES_BASE64` を設定すると `yt-dlp` に cookies を渡せます
 - シート反映時は要約行を `AI抽出` に追記しつつ、字幕全文とコメント全文を `台本DB` に保存します。`AI抽出` の `台本` / `コメント` 列から `/scripts/[scriptId]` の閲覧ページを開け、同ページから JSON もダウンロードできます
 - `/scripts/[scriptId]` の台本タブでは `AI校正` ボタンから、元の保存内容を変えずに見出し追加と話者切り替わり付近の改行を入れた表示を生成できます
+- `/scripts/[scriptId]` のコメントタブでは `コメント分析` ボタンから、総評・感情比率・視聴者像・各コメントごとの反応整理を右カラムへ表示できます
 - 共有できる URL をシートへ書き込みたい場合は `SCRIPT_VIEWER_BASE_URL` に公開URLを設定してください。未設定時はリクエスト元 origin を使います
 - `.pen` を更新したら、開発中は画面を再読込、本番反映は再ビルドで同期されます
 - 詳細仕様は `docs/requirement/requirements.md` を参照してください

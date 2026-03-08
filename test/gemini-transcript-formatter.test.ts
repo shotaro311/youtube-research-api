@@ -81,7 +81,7 @@ describe("formatTranscriptWithGemini", () => {
         transcript: "00:01 A\n00:02 B",
       }),
     ).resolves.toEqual({
-      title: "Gemini整形版",
+      title: "AI校正結果",
       sections: [
         {
           heading: "本文",

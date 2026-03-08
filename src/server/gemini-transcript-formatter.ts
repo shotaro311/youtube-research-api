@@ -114,7 +114,7 @@ function buildSectionBody(lines: string[], section: SectionPlan): string {
 
 function buildFallbackTranscript(lines: string[]): FormattedTranscript {
   return {
-    title: "Gemini整形版",
+    title: "AI校正結果",
     sections: [
       {
         heading: "本文",
@@ -127,7 +127,7 @@ function buildFallbackTranscript(lines: string[]): FormattedTranscript {
 function buildFormattedTranscriptFromPlan(value: string, lines: string[]): FormattedTranscript {
   try {
     const parsed = JSON.parse(value) as { title?: unknown; sections?: unknown };
-    const title = typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : "Gemini整形版";
+    const title = typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : "AI校正結果";
     const plans = normalizeSectionPlans(parsed.sections);
 
     if (plans.length === 0) {

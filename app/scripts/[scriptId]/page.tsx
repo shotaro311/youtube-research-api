@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { parseStoredComments } from "../../../src/domain/youtube/stored-comment";
 import { readStoredScript } from "../../../src/server/google-sheets";
-import { CopyContentButton } from "./copy-content-button";
+import { CommentsWorkspace } from "./comments-analysis-panel";
 import { TranscriptWorkspace } from "./formatted-transcript-panel";
 import styles from "./page.module.css";
 
@@ -20,11 +21,6 @@ type ScriptPageProps = {
 
 type ViewerTab = "transcript" | "comments";
 
-type StoredComment = {
-  author: string;
-  text: string;
-};
-
 function formatPublishedAt(value?: string): string {
   if (!value) {
     return "未取得";
@@ -38,51 +34,6 @@ function formatCount(value?: number): string {
   return typeof value === "number" ? new Intl.NumberFormat("ja-JP").format(value) : "未取得";
 }
 
-function parseStoredComments(value: string): StoredComment[] {
-  if (!value) {
-    return [];
-  }
-
-  const comments: StoredComment[] = [];
-  let current: StoredComment | null = null;
-
-  for (const rawLine of value.split("\n")) {
-    const line = rawLine.trim();
-    if (!line) {
-      continue;
-    }
-
-    const separatorIndex = line.indexOf(": ");
-    if (separatorIndex > 0) {
-      if (current) {
-        comments.push(current);
-      }
-
-      current = {
-        author: line.slice(0, separatorIndex),
-        text: line.slice(separatorIndex + 2),
-      };
-      continue;
-    }
-
-    if (current) {
-      current.text = `${current.text}\n${line}`.trim();
-      continue;
-    }
-
-    current = {
-      author: "投稿者不明",
-      text: line,
-    };
-  }
-
-  if (current) {
-    comments.push(current);
-  }
-
-  return comments;
-}
-
 export default async function ScriptPage({ params, searchParams }: ScriptPageProps): Promise<React.JSX.Element> {
   const { scriptId } = await params;
   const { tab } = await searchParams;
@@ -93,8 +44,6 @@ export default async function ScriptPage({ params, searchParams }: ScriptPagePro
   }
 
   const activeTab: ViewerTab = tab === "comments" ? "comments" : "transcript";
-  const currentText = activeTab === "comments" ? script.comments : script.transcript;
-  const currentTitle = activeTab === "comments" ? "コメント全文" : "台本全文";
   const comments = activeTab === "comments" ? parseStoredComments(script.comments) : [];
 
   return (
@@ -176,27 +125,7 @@ export default async function ScriptPage({ params, searchParams }: ScriptPagePro
         {activeTab === "transcript" ? (
           <TranscriptWorkspace scriptId={script.scriptId} originalText={script.transcript} />
         ) : (
-          <>
-            <div className={styles.sectionHeader}>
-              <h2>{currentTitle}</h2>
-              <div className={styles.sectionHeaderActions}>
-                <span>{comments.length > 0 ? `${comments.length}件` : currentText ? "保存済み" : "未取得"}</span>
-                <CopyContentButton text={currentText} idleLabel="コメントをコピー" />
-              </div>
-            </div>
-            {comments.length > 0 ? (
-              <div className={styles.commentList}>
-                {comments.map((comment, index) => (
-                  <article key={`${comment.author}-${index}`} className={styles.commentCard}>
-                    <p className={styles.commentAuthor}>{comment.author || "投稿者不明"}</p>
-                    <p className={styles.commentText}>{comment.text}</p>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <p className={styles.emptyText}>コメントは保存されていません。</p>
-            )}
-          </>
+          <CommentsWorkspace scriptId={script.scriptId} commentsText={script.comments} comments={comments} />
         )}
       </section>
     </main>

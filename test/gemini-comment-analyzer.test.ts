@@ -71,9 +71,9 @@ describe("analyzeCommentsWithGemini", () => {
     ).resolves.toEqual({
       title: "コメント分析結果",
       overview: "共感と実体験ベースの反応が多く、全体として好意的です。",
-      positivePercent: 60,
-      neutralPercent: 30,
-      negativePercent: 10,
+      positivePercent: 50,
+      neutralPercent: 50,
+      negativePercent: 0,
       audienceSummary: "当事者意識の高い視聴者が多そうです。",
       psychologySummary: "役立ちそうか、自分事として当てはまるかを見ています。",
       positiveThemes: ["共感", "参考になる"],

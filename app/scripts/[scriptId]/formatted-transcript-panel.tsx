@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import type { FormattedTranscript } from "../../../src/domain/youtube/transcript-format";
 import { CopyContentButton } from "./copy-content-button";
@@ -10,6 +10,10 @@ type TranscriptWorkspaceProps = {
   scriptId: string;
   originalText: string;
 };
+
+function getFormattedStorageKey(scriptId: string): string {
+  return `script-viewer:formatted:${scriptId}`;
+}
 
 function buildFormattedCopyText(formatted: FormattedTranscript | null): string {
   if (!formatted) {
@@ -26,6 +30,42 @@ export function TranscriptWorkspace({
   const [formatted, setFormatted] = useState<FormattedTranscript | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(getFormattedStorageKey(scriptId));
+      if (!stored) {
+        setFormatted(null);
+        return;
+      }
+
+      const parsed = JSON.parse(stored) as Partial<FormattedTranscript>;
+      if (!Array.isArray(parsed.sections)) {
+        setFormatted(null);
+        return;
+      }
+
+      setFormatted({
+        title: typeof parsed.title === "string" && parsed.title.trim() ? parsed.title : "AI校正結果",
+        sections: parsed.sections,
+      });
+    } catch {
+      setFormatted(null);
+    }
+  }, [scriptId]);
+
+  useEffect(() => {
+    try {
+      if (!formatted) {
+        window.localStorage.removeItem(getFormattedStorageKey(scriptId));
+        return;
+      }
+
+      window.localStorage.setItem(getFormattedStorageKey(scriptId), JSON.stringify(formatted));
+    } catch {
+      // ignore storage errors
+    }
+  }, [formatted, scriptId]);
 
   const handleFormat = () => {
     setErrorMessage("");

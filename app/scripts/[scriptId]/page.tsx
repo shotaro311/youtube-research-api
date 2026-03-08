@@ -3,8 +3,7 @@ import { notFound } from "next/navigation";
 
 import { parseStoredComments } from "../../../src/domain/youtube/stored-comment";
 import { readStoredScript } from "../../../src/server/google-sheets";
-import { CommentsWorkspace } from "./comments-analysis-panel";
-import { TranscriptWorkspace } from "./formatted-transcript-panel";
+import { ScriptViewerTabs } from "./script-viewer-tabs";
 import styles from "./page.module.css";
 
 export const runtime = "nodejs";
@@ -44,7 +43,7 @@ export default async function ScriptPage({ params, searchParams }: ScriptPagePro
   }
 
   const activeTab: ViewerTab = tab === "comments" ? "comments" : "transcript";
-  const comments = activeTab === "comments" ? parseStoredComments(script.comments) : [];
+  const comments = parseStoredComments(script.comments);
 
   return (
     <main className={styles.page}>
@@ -107,26 +106,13 @@ export default async function ScriptPage({ params, searchParams }: ScriptPagePro
       </section>
 
       <section className={styles.contentCard}>
-        <div className={styles.tabList}>
-          <Link
-            href={`/scripts/${script.scriptId}?tab=transcript`}
-            className={`${styles.tabLink} ${activeTab === "transcript" ? styles.tabLinkActive : ""}`}
-          >
-            台本
-          </Link>
-          <Link
-            href={`/scripts/${script.scriptId}?tab=comments`}
-            className={`${styles.tabLink} ${activeTab === "comments" ? styles.tabLinkActive : ""}`}
-          >
-            コメント
-          </Link>
-        </div>
-
-        {activeTab === "transcript" ? (
-          <TranscriptWorkspace scriptId={script.scriptId} originalText={script.transcript} />
-        ) : (
-          <CommentsWorkspace scriptId={script.scriptId} commentsText={script.comments} comments={comments} />
-        )}
+        <ScriptViewerTabs
+          scriptId={script.scriptId}
+          transcript={script.transcript}
+          commentsText={script.comments}
+          comments={comments}
+          initialTab={activeTab}
+        />
       </section>
     </main>
   );

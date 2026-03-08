@@ -252,15 +252,26 @@
 }
 
 .tabLink {
+  border: 0;
+  background: transparent;
   padding: 10px 16px;
   border-radius: 999px;
   color: #c9d9f5;
-  text-decoration: none;
+  font: inherit;
+  cursor: pointer;
 }
 
 .tabLinkActive {
   background: linear-gradient(135deg, rgba(88, 166, 255, 0.22), rgba(127, 224, 255, 0.18));
   color: #ffffff;
+}
+
+.tabPanelHidden {
+  display: none;
+}
+
+.tabPanelActive {
+  display: block;
 }
 
 .sectionHeader {
@@ -336,23 +347,14 @@
   color: #8bb8ff;
 }
 
-.commentText {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  line-height: 1.75;
-  color: #e7f0ff;
-}
-
 .analysisPanel {
   display: grid;
   gap: 16px;
 }
 
 .analysisSummaryCard,
+.analysisSectionCard,
 .analysisRatioCard,
-.analysisInsightCard,
-.analysisThemeCard,
 .analysisCommentCard {
   border-radius: 18px;
   border: 1px solid rgba(146, 178, 229, 0.12);
@@ -360,10 +362,29 @@
 }
 
 .analysisSummaryCard,
-.analysisInsightCard,
-.analysisThemeCard,
+.analysisSectionCard,
 .analysisCommentCard {
   padding: 16px 18px;
+}
+
+.analysisSummaryHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.analysisSummaryActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.analysisSummaryStack {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
 }
 
 .analysisSummaryTitle {
@@ -380,45 +401,12 @@
   color: #eef4ff;
 }
 
-.analysisRatioGrid,
-.analysisInsightGrid,
-.analysisThemeGrid {
-  display: grid;
-  gap: 12px;
-}
-
-.analysisRatioGrid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.analysisInsightGrid,
-.analysisThemeGrid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.analysisRatioCard {
-  padding: 14px 16px;
-  text-align: center;
-}
-
-.analysisRatioCard p {
-  margin: 0 0 8px;
-  font-size: 12px;
-  color: #9ab0d4;
-}
-
-.analysisRatioCard strong {
-  font-size: 24px;
-  line-height: 1;
-}
-
-.analysisInsightCard h4,
-.analysisThemeCard h4 {
+.analysisSectionCard h4 {
   margin: 0 0 10px;
   font-size: 15px;
 }
 
-.analysisInsightCard p {
+.analysisSectionCard p {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
@@ -426,19 +414,55 @@
   color: #e7f0ff;
 }
 
-.analysisThemeCard ul {
+.analysisBulletList {
   margin: 0;
   padding-left: 18px;
   color: #e7f0ff;
 }
 
-.analysisThemeCard li + li {
+.analysisBulletList li + li {
   margin-top: 8px;
 }
 
-.analysisCommentList {
+.analysisRatioList {
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.analysisRatioCard {
+  display: grid;
+  align-content: space-between;
   gap: 14px;
+  min-height: 132px;
+  padding: 18px 20px;
+}
+
+.analysisRatioCard p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #eef4ff;
+}
+
+.analysisRatioCard strong {
+  align-self: end;
+  font-size: clamp(34px, 5vw, 44px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: #ffffff;
+}
+
+.analysisRatioPositive strong {
+  color: #d8ffe7;
+}
+
+.analysisRatioNeutral strong {
+  color: #eff5ff;
+}
+
+.analysisRatioNegative strong {
+  color: #ffe4e4;
 }
 
 .analysisCommentHeader {
@@ -455,6 +479,72 @@
   word-break: break-word;
   line-height: 1.7;
   color: #e7f0ff;
+}
+
+.commentBodyBlock {
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(146, 178, 229, 0.12);
+  background: rgba(2, 10, 24, 0.5);
+}
+
+.commentBodyLabel {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #8bb8ff;
+}
+
+.commentTextStrong {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.78;
+  font-size: 18px;
+  font-weight: 700;
+  color: #f4f8ff;
+}
+
+.commentFilterBar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.filterMeta {
+  font-size: 13px;
+  color: #9ab0d4;
+}
+
+.filterChipGroup {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.filterChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid rgba(146, 178, 229, 0.2);
+  border-radius: 999px;
+  background: rgba(11, 29, 58, 0.58);
+  color: #d8e5ff;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.filterChipActive {
+  border-color: rgba(127, 224, 255, 0.5);
+  background: linear-gradient(135deg, rgba(127, 224, 255, 0.22), rgba(88, 166, 255, 0.18));
+  color: #ffffff;
 }
 
 .sentimentBadge {
@@ -507,6 +597,11 @@
   color: #eef4ff;
 }
 
+.analysisCommentList {
+  display: grid;
+  gap: 14px;
+}
+
 .emptyText {
   margin: 0;
   color: #9ab0d4;
@@ -520,12 +615,6 @@
   .summaryLayout,
   .summaryGrid,
   .transcriptGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .analysisRatioGrid,
-  .analysisInsightGrid,
-  .analysisThemeGrid {
     grid-template-columns: 1fr;
   }
 
@@ -549,8 +638,19 @@
     flex-direction: column;
   }
 
-  .analysisCommentHeader {
+  .analysisSummaryHeader,
+  .analysisSummaryActions,
+  .analysisCommentHeader,
+  .commentFilterBar {
     flex-direction: column;
+  }
+
+  .filterChipGroup {
+    justify-content: flex-start;
+  }
+
+  .analysisRatioList {
+    grid-template-columns: 1fr;
   }
 
   .formatButton {
@@ -559,5 +659,9 @@
 
   .copyButton {
     width: 100%;
+  }
+
+  .commentTextStrong {
+    font-size: 15px;
   }
 }

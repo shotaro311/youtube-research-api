@@ -113,14 +113,8 @@ function normalizeAnalysisItems(value: unknown): AnalysisItemPlan[] {
 }
 
 function normalizePercentages(
-  analysis: Pick<CommentAnalysis, "positivePercent" | "neutralPercent" | "negativePercent">,
   items: CommentAnalysisItem[],
 ): Pick<CommentAnalysis, "positivePercent" | "neutralPercent" | "negativePercent"> {
-  const sum = analysis.positivePercent + analysis.neutralPercent + analysis.negativePercent;
-  if (sum === 100) {
-    return analysis;
-  }
-
   if (items.length === 0) {
     return {
       positivePercent: 0,
@@ -193,7 +187,7 @@ function buildCommentAnalysisFromResponse(value: string, comments: StoredComment
 
     return {
       ...analysis,
-      ...normalizePercentages(analysis, items),
+      ...normalizePercentages(items),
     };
   } catch {
     throw new UpstreamServiceError("Gemini のコメント分析結果の解析に失敗しました。");

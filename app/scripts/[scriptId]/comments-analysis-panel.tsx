@@ -283,6 +283,28 @@ export function CommentsWorkspace({
     });
   };
 
+  const handleQuickSentimentChange = async (commentIndex: number, sentiment: CommentSentiment) => {
+    if (!displayAnalysis) {
+      return;
+    }
+
+    const source = draftAnalysis ? cloneAnalysis(draftAnalysis) : cloneAnalysis(displayAnalysis);
+    const nextAnalysis = normalizeCommentAnalysis({
+      ...source,
+      items: source.items.map((item) =>
+        item.commentIndex === commentIndex
+          ? {
+              ...item,
+              sentiment,
+            }
+          : item,
+      ),
+    });
+
+    setDraftAnalysis(nextAnalysis);
+    await persistAnalysis(nextAnalysis);
+  };
+
   const persistAnalysis = async (nextAnalysis: CommentAnalysis) => {
     setIsSaving(true);
     setErrorMessage("");
@@ -542,9 +564,29 @@ export function CommentsWorkspace({
                 >
                   JSON保存
                 </button>
-                <button type="button" onClick={startSummaryEdit} className={styles.iconButton}>
-                  編集
-                </button>
+                {isSummaryEditing ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (draftAnalysis) {
+                          void persistAnalysis(draftAnalysis);
+                        }
+                      }}
+                      disabled={!draftAnalysis || isSaving}
+                      className={styles.iconButton}
+                    >
+                      {isSaving ? "保存中..." : "保存"}
+                    </button>
+                    <button type="button" onClick={cancelSummaryEdit} className={styles.copyButton}>
+                      キャンセル
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" onClick={startSummaryEdit} className={styles.iconButton}>
+                    編集
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => void handleDeleteAnalysis()}
@@ -719,25 +761,6 @@ export function CommentsWorkspace({
                   )}
                 </section>
 
-                {isSummaryEditing ? (
-                  <div className={styles.editActionRow}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (draftAnalysis) {
-                          void persistAnalysis(draftAnalysis);
-                        }
-                      }}
-                      disabled={!draftAnalysis || isSaving}
-                      className={styles.formatButton}
-                    >
-                      {isSaving ? "保存中..." : "保存"}
-                    </button>
-                    <button type="button" onClick={cancelSummaryEdit} className={styles.copyButton}>
-                      キャンセル
-                    </button>
-                  </div>
-                ) : null}
               </div>
             ) : null}
           </section>
@@ -805,16 +828,46 @@ export function CommentsWorkspace({
                   <div className={styles.analysisCommentHeader}>
                     <p className={styles.commentAuthor}>{comment?.author || "投稿者不明"}</p>
                     <div className={styles.analysisCommentActions}>
-                      <span className={`${styles.sentimentBadge} ${styles[`sentiment${editingItem.sentiment}`]}`}>
-                        {getSentimentLabel(editingItem.sentiment)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => startCommentEdit(item.commentIndex)}
-                        className={styles.iconButton}
+                      <select
+                        className={`${styles.analysisSelect} ${styles.sentimentQuickSelect}`}
+                        value={editingItem.sentiment}
+                        onChange={(event) =>
+                          void handleQuickSentimentChange(item.commentIndex, event.target.value as CommentSentiment)
+                        }
+                        disabled={isSaving || isSummaryEditing || (editingCommentIndex !== null && !isEditingThis)}
+                        aria-label={`コメント ${item.commentIndex} の感情タグ`}
                       >
-                        編集
-                      </button>
+                        <option value="positive">ポジティブ</option>
+                        <option value="neutral">中立</option>
+                        <option value="negative">ネガティブ</option>
+                      </select>
+                      {isEditingThis ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (draftAnalysis) {
+                                void persistAnalysis(draftAnalysis);
+                              }
+                            }}
+                            disabled={!draftAnalysis || isSaving}
+                            className={styles.iconButton}
+                          >
+                            {isSaving ? "保存中..." : "保存"}
+                          </button>
+                          <button type="button" onClick={cancelCommentEdit} className={styles.copyButton}>
+                            キャンセル
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => startCommentEdit(item.commentIndex)}
+                          className={styles.iconButton}
+                        >
+                          編集
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -825,30 +878,6 @@ export function CommentsWorkspace({
 
                   {isEditingThis ? (
                     <div className={styles.analysisEditForm}>
-                      <label className={styles.analysisField}>
-                        <span>感情タグ</span>
-                        <select
-                          className={styles.analysisSelect}
-                          value={editingItem.sentiment}
-                          onChange={(event) =>
-                            updateDraftAnalysis((current) => ({
-                              ...current,
-                              items: current.items.map((candidate) =>
-                                candidate.commentIndex === item.commentIndex
-                                  ? {
-                                      ...candidate,
-                                      sentiment: event.target.value as CommentSentiment,
-                                    }
-                                  : candidate,
-                              ),
-                            }))
-                          }
-                        >
-                          <option value="positive">ポジティブ</option>
-                          <option value="neutral">中立</option>
-                          <option value="negative">ネガティブ</option>
-                        </select>
-                      </label>
                       <label className={styles.analysisField}>
                         <span>視聴者像</span>
                         <textarea
@@ -909,23 +938,6 @@ export function CommentsWorkspace({
                           }
                         />
                       </label>
-                      <div className={styles.editActionRow}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (draftAnalysis) {
-                              void persistAnalysis(draftAnalysis);
-                            }
-                          }}
-                          disabled={!draftAnalysis || isSaving}
-                          className={styles.formatButton}
-                        >
-                          {isSaving ? "保存中..." : "保存"}
-                        </button>
-                        <button type="button" onClick={cancelCommentEdit} className={styles.copyButton}>
-                          キャンセル
-                        </button>
-                      </div>
                     </div>
                   ) : (
                     <dl className={styles.analysisDetailList}>

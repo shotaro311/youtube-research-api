@@ -111,6 +111,7 @@ export default async function ScriptPage({ params, searchParams }: ScriptPagePro
           transcript={script.transcript}
           commentsText={script.comments}
           comments={comments}
+          initialCommentAnalysis={script.commentAnalysis ?? null}
           initialTab={activeTab}
         />
       </section>

@@ -1,6 +1,11 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-import type { CommentAnalysis, CommentAnalysisItem, CommentSentiment } from "../domain/youtube/comment-analysis";
+import {
+  normalizeCommentAnalysis,
+  type CommentAnalysis,
+  type CommentAnalysisItem,
+  type CommentSentiment,
+} from "../domain/youtube/comment-analysis";
 import type { StoredComment } from "../domain/youtube/stored-comment";
 import { BadRequestError, UpstreamServiceError } from "../domain/youtube/errors";
 
@@ -112,32 +117,6 @@ function normalizeAnalysisItems(value: unknown): AnalysisItemPlan[] {
     .filter((item): item is AnalysisItemPlan => Boolean(item));
 }
 
-function normalizePercentages(
-  items: CommentAnalysisItem[],
-): Pick<CommentAnalysis, "positivePercent" | "neutralPercent" | "negativePercent"> {
-  if (items.length === 0) {
-    return {
-      positivePercent: 0,
-      neutralPercent: 100,
-      negativePercent: 0,
-    };
-  }
-
-  const counts = items.reduce(
-    (acc, item) => {
-      acc[item.sentiment] += 1;
-      return acc;
-    },
-    { positive: 0, neutral: 0, negative: 0 },
-  );
-
-  const positivePercent = Math.round((counts.positive / items.length) * 100);
-  const neutralPercent = Math.round((counts.neutral / items.length) * 100);
-  const negativePercent = 100 - positivePercent - neutralPercent;
-
-  return { positivePercent, neutralPercent, negativePercent };
-}
-
 function buildFallbackOverview(comments: StoredComment[]): string {
   if (comments.length === 0) {
     return "コメントが保存されていません。";
@@ -185,10 +164,7 @@ function buildCommentAnalysisFromResponse(value: string, comments: StoredComment
       items,
     };
 
-    return {
-      ...analysis,
-      ...normalizePercentages(items),
-    };
+    return normalizeCommentAnalysis(analysis);
   } catch {
     throw new UpstreamServiceError("Gemini のコメント分析結果の解析に失敗しました。");
   }

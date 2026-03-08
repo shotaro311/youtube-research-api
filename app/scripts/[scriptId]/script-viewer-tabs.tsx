@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type React from "react";
 
+import type { CommentAnalysis } from "../../../src/domain/youtube/comment-analysis";
 import type { StoredComment } from "../../../src/domain/youtube/stored-comment";
 import { CommentsWorkspace } from "./comments-analysis-panel";
 import { TranscriptWorkspace } from "./formatted-transcript-panel";
@@ -15,6 +16,7 @@ type ScriptViewerTabsProps = {
   transcript: string;
   commentsText: string;
   comments: StoredComment[];
+  initialCommentAnalysis?: CommentAnalysis | null;
   initialTab: ViewerTab;
 };
 
@@ -27,6 +29,7 @@ export function ScriptViewerTabs({
   transcript,
   commentsText,
   comments,
+  initialCommentAnalysis = null,
   initialTab,
 }: ScriptViewerTabsProps): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<ViewerTab>(initialTab);
@@ -70,7 +73,12 @@ export function ScriptViewerTabs({
       </div>
 
       <div className={activeTab === "comments" ? styles.tabPanelActive : styles.tabPanelHidden}>
-        <CommentsWorkspace scriptId={scriptId} commentsText={commentsText} comments={comments} />
+        <CommentsWorkspace
+          scriptId={scriptId}
+          commentsText={commentsText}
+          comments={comments}
+          initialAnalysis={initialCommentAnalysis}
+        />
       </div>
     </>
   );

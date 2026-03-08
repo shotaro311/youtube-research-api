@@ -4,6 +4,7 @@ import { join } from "path";
 
 import { google } from "googleapis";
 
+import type { CommentAnalysis } from "../domain/youtube/comment-analysis";
 import { BadRequestError, UpstreamServiceError } from "../domain/youtube/errors";
 import type { ExtractVideoResponse } from "../domain/youtube/types";
 
@@ -44,6 +45,7 @@ export type StoredScriptDocument = {
   thumbnailUrl?: string;
   transcript: string;
   comments: string;
+  commentAnalysis?: CommentAnalysis;
 };
 
 type ServiceAccountCredentials = {
@@ -168,6 +170,19 @@ function parseStoredMeta(
   }
 }
 
+function parseStoredCommentAnalysis(value: unknown): CommentAnalysis | undefined {
+  if (typeof value !== "string" || !value) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as CommentAnalysis;
+    return Array.isArray(parsed.items) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function buildThumbnailFormula(thumbnailUrl?: string): string {
   return thumbnailUrl ? `=IMAGE("${thumbnailUrl}",4,${THUMBNAIL_HEIGHT_PX},${THUMBNAIL_WIDTH_PX})` : "";
 }
@@ -250,6 +265,84 @@ async function resizeAiExtractThumbnailArea(
       ],
     },
   });
+}
+
+async function getSheetIdByTitle(
+  sheets: Awaited<ReturnType<typeof createSheetsClient>>,
+  spreadsheetId: string,
+  title: string,
+): Promise<number> {
+  const sheetResponse = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets(properties(sheetId,title))",
+  });
+  const sheetId = sheetResponse.data.sheets?.find((sheet) => sheet.properties?.title === title)?.properties?.sheetId;
+
+  if (typeof sheetId !== "number") {
+    throw new UpstreamServiceError(`${title} シートが見つかりません。`);
+  }
+
+  return sheetId;
+}
+
+function buildStoredContentRows(
+  script: Pick<StoredScriptDocument, "scriptId" | "videoId" | "url" | "title">,
+  rowType: "comment_analysis",
+  content: string,
+  createdAt = new Date().toISOString(),
+): string[][] {
+  return chunkText(content).map((chunk, chunkIndex) => [
+    script.scriptId,
+    script.videoId,
+    script.url,
+    script.title,
+    rowType,
+    String(chunkIndex),
+    chunk,
+    createdAt,
+  ]);
+}
+
+async function deleteScriptRowsByType(
+  sheets: Awaited<ReturnType<typeof createSheetsClient>>,
+  spreadsheetId: string,
+  scriptId: string,
+  rowType: string,
+): Promise<string[][]> {
+  const sheetName = getScriptDbSheetName();
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${sheetName}!A:H`,
+  });
+  const rows = response.data.values ?? [];
+  const targetIndexes = rows
+    .map((row, index) => ({ row, index }))
+    .filter((entry) => entry.row[0] === scriptId && entry.row[4] === rowType)
+    .map((entry) => entry.index)
+    .sort((left, right) => right - left);
+
+  if (targetIndexes.length === 0) {
+    return rows;
+  }
+
+  const sheetId = await getSheetIdByTitle(sheets, spreadsheetId, sheetName);
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: targetIndexes.map((index) => ({
+        deleteDimension: {
+          range: {
+            sheetId,
+            dimension: "ROWS",
+            startIndex: index,
+            endIndex: index + 1,
+          },
+        },
+      })),
+    },
+  });
+
+  return rows;
 }
 
 export function buildAiExtractSheetRows(
@@ -411,7 +504,7 @@ export async function readStoredScript(scriptId: string): Promise<StoredScriptDo
   const metaRow = rows.find((row) => row[4] === "meta");
   const metadata = parseStoredMeta(metaRow?.[6]);
 
-  const collectContent = (kind: "transcript" | "comments"): string =>
+  const collectContent = (kind: "transcript" | "comments" | "comment_analysis"): string =>
     rows
       .filter((row) => row[4] === kind)
       .sort((left, right) => Number(left[5] ?? "0") - Number(right[5] ?? "0"))
@@ -431,5 +524,47 @@ export async function readStoredScript(scriptId: string): Promise<StoredScriptDo
     thumbnailUrl: metadata.thumbnailUrl,
     transcript: collectContent("transcript"),
     comments: collectContent("comments"),
+    commentAnalysis: parseStoredCommentAnalysis(collectContent("comment_analysis")),
   };
+}
+
+export async function saveStoredCommentAnalysis(scriptId: string, analysis: CommentAnalysis): Promise<void> {
+  if (!scriptId) {
+    throw new BadRequestError("scriptId is required");
+  }
+
+  const sheets = await createSheetsClient();
+  const spreadsheetId = getSpreadsheetId();
+  const rows = await deleteScriptRowsByType(sheets, spreadsheetId, scriptId, "comment_analysis");
+  const scriptRows = rows.filter((row) => row[0] === scriptId);
+  const metaRow = scriptRows.find((row) => row[4] === "meta");
+
+  if (!metaRow) {
+    throw new BadRequestError("script not found");
+  }
+
+  const payloadRows = buildStoredContentRows(
+    {
+      scriptId,
+      videoId: metaRow[1] ?? "",
+      url: metaRow[2] ?? "",
+      title: metaRow[3] ?? "",
+    },
+    "comment_analysis",
+    JSON.stringify(analysis),
+  );
+
+  if (payloadRows.length === 0) {
+    return;
+  }
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: `${getScriptDbSheetName()}!A:H`,
+    valueInputOption: "RAW",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: {
+      values: payloadRows,
+    },
+  });
 }

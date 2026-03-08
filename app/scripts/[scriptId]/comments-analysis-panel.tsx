@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import type { CSSProperties } from "react";
 
-import type { CommentAnalysis, CommentSentiment } from "../../../src/domain/youtube/comment-analysis";
+import {
+  normalizeCommentAnalysis,
+  type CommentAnalysis,
+  type CommentSentiment,
+} from "../../../src/domain/youtube/comment-analysis";
 import type { StoredComment } from "../../../src/domain/youtube/stored-comment";
 import { CopyContentButton } from "./copy-content-button";
 import styles from "./page.module.css";
@@ -12,6 +16,7 @@ type CommentsWorkspaceProps = {
   scriptId: string;
   commentsText: string;
   comments: StoredComment[];
+  initialAnalysis?: CommentAnalysis | null;
 };
 
 type CommentAnalysisExportPayload = {
@@ -49,6 +54,10 @@ function getCommentAnalysisStorageKey(scriptId: string): string {
   return `script-viewer:comment-analysis:${scriptId}`;
 }
 
+function cloneAnalysis(value: CommentAnalysis): CommentAnalysis {
+  return JSON.parse(JSON.stringify(value)) as CommentAnalysis;
+}
+
 function getSentimentLabel(sentiment: CommentSentiment): string {
   if (sentiment === "positive") {
     return "ポジティブ";
@@ -71,6 +80,13 @@ function buildRatioCardStyle(rgb: string, value: number): CSSProperties {
     borderColor: `rgba(${rgb}, ${Math.min(strong + 0.18, 0.72)})`,
     boxShadow: `inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 22px rgba(${rgb}, 0.08)`,
   };
+}
+
+function parseThemeLines(value: string): string[] {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
 }
 
 function buildAnalysisExportPayload(
@@ -162,55 +178,84 @@ function downloadJsonFile(fileName: string, payload: CommentAnalysisExportPayloa
   URL.revokeObjectURL(blobUrl);
 }
 
+function parseStoredState(value: string | null): PersistedCommentAnalysisState | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Partial<PersistedCommentAnalysisState>;
+    const analysis =
+      parsed.analysis &&
+      typeof parsed.analysis === "object" &&
+      Array.isArray(parsed.analysis.items) &&
+      Array.isArray(parsed.analysis.positiveThemes) &&
+      Array.isArray(parsed.analysis.negativeThemes)
+        ? normalizeCommentAnalysis(parsed.analysis)
+        : null;
+
+    return {
+      analysis,
+      isSummaryExpanded: parsed.isSummaryExpanded !== false,
+      activeFilter:
+        parsed.activeFilter === "positive" || parsed.activeFilter === "neutral" || parsed.activeFilter === "negative"
+          ? parsed.activeFilter
+          : "all",
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function CommentsWorkspace({
   scriptId,
   commentsText,
   comments,
+  initialAnalysis = null,
 }: CommentsWorkspaceProps): React.JSX.Element {
-  const [analysis, setAnalysis] = useState<CommentAnalysis | null>(null);
+  const [analysis, setAnalysis] = useState<CommentAnalysis | null>(
+    initialAnalysis ? normalizeCommentAnalysis(initialAnalysis) : null,
+  );
+  const [draftAnalysis, setDraftAnalysis] = useState<CommentAnalysis | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const [isPending, startTransition] = useTransition();
+  const [saveMessage, setSaveMessage] = useState("");
+  const [isGenerating, startGenerateTransition] = useTransition();
+  const [isSaving, setIsSaving] = useState(false);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(true);
   const [activeFilter, setActiveFilter] = useState<CommentFilter>("all");
+  const [isSummaryEditing, setIsSummaryEditing] = useState(false);
+  const [editingCommentIndex, setEditingCommentIndex] = useState<number | null>(null);
+
+  const showSaveMessage = (message: string) => {
+    setSaveMessage(message);
+    window.setTimeout(() => setSaveMessage(""), 1800);
+  };
 
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(getCommentAnalysisStorageKey(scriptId));
-      if (!stored) {
-        setAnalysis(null);
-        setIsSummaryExpanded(true);
-        setActiveFilter("all");
-        return;
-      }
-
-      const parsed = JSON.parse(stored) as Partial<PersistedCommentAnalysisState>;
-      const nextAnalysis =
-        parsed.analysis &&
-        typeof parsed.analysis === "object" &&
-        Array.isArray(parsed.analysis.items) &&
-        Array.isArray(parsed.analysis.positiveThemes) &&
-        Array.isArray(parsed.analysis.negativeThemes)
-          ? parsed.analysis
-          : null;
-
-      setAnalysis(nextAnalysis);
-      setIsSummaryExpanded(parsed.isSummaryExpanded !== false);
-      setActiveFilter(
-        parsed.activeFilter === "positive" || parsed.activeFilter === "neutral" || parsed.activeFilter === "negative"
-          ? parsed.activeFilter
-          : "all",
-      );
-    } catch {
-      setAnalysis(null);
-      setIsSummaryExpanded(true);
-      setActiveFilter("all");
+    const stored = parseStoredState(window.localStorage.getItem(getCommentAnalysisStorageKey(scriptId)));
+    if (stored) {
+      setAnalysis(stored.analysis);
+      setDraftAnalysis(null);
+      setIsSummaryExpanded(stored.isSummaryExpanded);
+      setActiveFilter(stored.activeFilter);
+      return;
     }
-  }, [scriptId]);
+
+    setAnalysis(initialAnalysis ? normalizeCommentAnalysis(initialAnalysis) : null);
+    setDraftAnalysis(null);
+    setIsSummaryExpanded(true);
+    setActiveFilter("all");
+  }, [initialAnalysis, scriptId]);
+
+  const displayAnalysis = useMemo(
+    () => (draftAnalysis ? normalizeCommentAnalysis(draftAnalysis) : analysis ? normalizeCommentAnalysis(analysis) : null),
+    [analysis, draftAnalysis],
+  );
 
   useEffect(() => {
     try {
       const payload: PersistedCommentAnalysisState = {
-        analysis,
+        analysis: displayAnalysis,
         isSummaryExpanded,
         activeFilter,
       };
@@ -218,30 +263,34 @@ export function CommentsWorkspace({
     } catch {
       // ignore storage errors
     }
-  }, [activeFilter, analysis, isSummaryExpanded, scriptId]);
+  }, [activeFilter, displayAnalysis, isSummaryExpanded, scriptId]);
 
-  const handleAnalyze = () => {
+  const persistAnalysis = async (nextAnalysis: CommentAnalysis) => {
+    setIsSaving(true);
     setErrorMessage("");
-
-    startTransition(async () => {
+    setSaveMessage("");
+    try {
+      const normalized = normalizeCommentAnalysis(nextAnalysis);
       const response = await fetch(`/api/v1/scripts/${scriptId}/comments/analyze`, {
-        method: "POST",
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(normalized),
       });
       const body = (await response.json().catch(() => ({}))) as Partial<CommentAnalysis> & { error?: string };
 
       if (!response.ok) {
-        setAnalysis(null);
-        setErrorMessage(body.error || "コメント分析に失敗しました。");
+        setErrorMessage(body.error || "コメント分析の保存に失敗しました。");
         return;
       }
 
       if (!Array.isArray(body.items)) {
-        setAnalysis(null);
-        setErrorMessage("コメント分析結果の形式が不正です。");
+        setErrorMessage("保存したコメント分析結果の形式が不正です。");
         return;
       }
 
-      setAnalysis({
+      const savedAnalysis = normalizeCommentAnalysis({
         title: typeof body.title === "string" && body.title.trim() ? body.title : "コメント分析結果",
         overview: typeof body.overview === "string" ? body.overview : "",
         positivePercent: typeof body.positivePercent === "number" ? body.positivePercent : 0,
@@ -268,21 +317,129 @@ export function CommentsWorkspace({
             typeof item.note === "string",
         ),
       });
-      setIsSummaryExpanded(true);
-      setActiveFilter("all");
+
+      setAnalysis(savedAnalysis);
+      setDraftAnalysis(null);
+      setIsSummaryEditing(false);
+      setEditingCommentIndex(null);
+      showSaveMessage("保存しました");
+    } catch {
+      setErrorMessage("コメント分析の保存に失敗しました。");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAnalyze = () => {
+    setErrorMessage("");
+    setSaveMessage("");
+
+    startGenerateTransition(async () => {
+      try {
+        const response = await fetch(`/api/v1/scripts/${scriptId}/comments/analyze`, {
+          method: "POST",
+        });
+        const body = (await response.json().catch(() => ({}))) as Partial<CommentAnalysis> & { error?: string };
+
+        if (!response.ok) {
+          setErrorMessage(body.error || "コメント分析に失敗しました。");
+          return;
+        }
+
+        if (!Array.isArray(body.items)) {
+          setErrorMessage("コメント分析結果の形式が不正です。");
+          return;
+        }
+
+        setAnalysis(
+          normalizeCommentAnalysis({
+            title: typeof body.title === "string" && body.title.trim() ? body.title : "コメント分析結果",
+            overview: typeof body.overview === "string" ? body.overview : "",
+            positivePercent: typeof body.positivePercent === "number" ? body.positivePercent : 0,
+            neutralPercent: typeof body.neutralPercent === "number" ? body.neutralPercent : 0,
+            negativePercent: typeof body.negativePercent === "number" ? body.negativePercent : 0,
+            audienceSummary: typeof body.audienceSummary === "string" ? body.audienceSummary : "",
+            psychologySummary: typeof body.psychologySummary === "string" ? body.psychologySummary : "",
+            positiveThemes: Array.isArray(body.positiveThemes)
+              ? body.positiveThemes.filter((item): item is string => typeof item === "string")
+              : [],
+            negativeThemes: Array.isArray(body.negativeThemes)
+              ? body.negativeThemes.filter((item): item is string => typeof item === "string")
+              : [],
+            items: body.items.filter(
+              (
+                item,
+              ): item is CommentAnalysis["items"][number] =>
+                typeof item === "object" &&
+                item !== null &&
+                typeof item.commentIndex === "number" &&
+                (item.sentiment === "positive" || item.sentiment === "neutral" || item.sentiment === "negative") &&
+                typeof item.viewerType === "string" &&
+                typeof item.psychology === "string" &&
+                typeof item.note === "string",
+            ),
+          }),
+        );
+        setDraftAnalysis(null);
+        setIsSummaryExpanded(true);
+        setActiveFilter("all");
+        setIsSummaryEditing(false);
+        setEditingCommentIndex(null);
+      } catch {
+        setErrorMessage("コメント分析に失敗しました。");
+      }
     });
   };
 
-  const exportPayload = buildAnalysisExportPayload(analysis, comments);
+  const startSummaryEdit = () => {
+    if (!displayAnalysis) {
+      return;
+    }
+
+    setDraftAnalysis(cloneAnalysis(displayAnalysis));
+    setIsSummaryEditing(true);
+    setEditingCommentIndex(null);
+    setSaveMessage("");
+  };
+
+  const cancelSummaryEdit = () => {
+    setDraftAnalysis(null);
+    setIsSummaryEditing(false);
+  };
+
+  const updateDraftAnalysis = (updater: (current: CommentAnalysis) => CommentAnalysis) => {
+    setDraftAnalysis((current) => {
+      const base = current ? cloneAnalysis(current) : analysis ? cloneAnalysis(analysis) : null;
+      return base ? updater(base) : base;
+    });
+  };
+
+  const startCommentEdit = (commentIndex: number) => {
+    if (!displayAnalysis) {
+      return;
+    }
+
+    setDraftAnalysis(cloneAnalysis(displayAnalysis));
+    setEditingCommentIndex(commentIndex);
+    setIsSummaryEditing(false);
+    setSaveMessage("");
+  };
+
+  const cancelCommentEdit = () => {
+    setDraftAnalysis(null);
+    setEditingCommentIndex(null);
+  };
+
+  const exportPayload = buildAnalysisExportPayload(displayAnalysis, comments);
   const filteredItems =
-    analysis === null
+    displayAnalysis === null
       ? []
-      : analysis.items.filter((item) => (activeFilter === "all" ? true : item.sentiment === activeFilter));
+      : displayAnalysis.items.filter((item) => (activeFilter === "all" ? true : item.sentiment === activeFilter));
   const filterCounts = {
-    all: analysis?.items.length ?? 0,
-    positive: analysis?.items.filter((item) => item.sentiment === "positive").length ?? 0,
-    neutral: analysis?.items.filter((item) => item.sentiment === "neutral").length ?? 0,
-    negative: analysis?.items.filter((item) => item.sentiment === "negative").length ?? 0,
+    all: displayAnalysis?.items.length ?? 0,
+    positive: displayAnalysis?.items.filter((item) => item.sentiment === "positive").length ?? 0,
+    neutral: displayAnalysis?.items.filter((item) => item.sentiment === "neutral").length ?? 0,
+    negative: displayAnalysis?.items.filter((item) => item.sentiment === "negative").length ?? 0,
   };
 
   return (
@@ -295,17 +452,18 @@ export function CommentsWorkspace({
           <button
             type="button"
             onClick={handleAnalyze}
-            disabled={!commentsText.trim() || isPending}
+            disabled={!commentsText.trim() || isGenerating}
             className={styles.formatButton}
           >
-            {isPending ? "分析中..." : "コメント分析"}
+            {isGenerating ? "分析中..." : "コメント分析"}
           </button>
         </div>
       </div>
 
       {errorMessage ? <p className={styles.formatError}>{errorMessage}</p> : null}
+      {saveMessage ? <p className={styles.saveMessage}>{saveMessage}</p> : null}
 
-      {analysis ? (
+      {displayAnalysis ? (
         <div className={styles.analysisPanel}>
           <section className={styles.analysisSummaryCard}>
             <div className={styles.analysisSummaryHeader}>
@@ -314,7 +472,7 @@ export function CommentsWorkspace({
                 <h3 className={styles.transcriptCardTitle}>コメント分析総評</h3>
               </div>
               <div className={styles.analysisSummaryActions}>
-                <CopyContentButton text={buildAnalysisCopyText(analysis, comments)} idleLabel="分析一式をコピー" />
+                <CopyContentButton text={buildAnalysisCopyText(displayAnalysis, comments)} idleLabel="分析一式をコピー" />
                 <button
                   type="button"
                   onClick={() => downloadJsonFile(`comment-analysis-${scriptId}.json`, exportPayload)}
@@ -322,6 +480,9 @@ export function CommentsWorkspace({
                   className={styles.copyButton}
                 >
                   JSON保存
+                </button>
+                <button type="button" onClick={startSummaryEdit} className={styles.iconButton}>
+                  編集
                 </button>
                 <button
                   type="button"
@@ -336,65 +497,160 @@ export function CommentsWorkspace({
             {isSummaryExpanded ? (
               <div className={styles.analysisSummaryStack}>
                 <section className={styles.analysisSectionCard}>
-                  <p className={styles.analysisSummaryTitle}>全体の総評</p>
-                  <p className={styles.analysisSummaryText}>{analysis.overview}</p>
+                  <div className={styles.editableCardHeader}>
+                    <p className={styles.analysisSummaryTitle}>全体の総評</p>
+                  </div>
+                  {isSummaryEditing ? (
+                    <textarea
+                      className={styles.analysisTextarea}
+                      value={draftAnalysis?.overview ?? ""}
+                      onChange={(event) =>
+                        updateDraftAnalysis((current) => ({
+                          ...current,
+                          overview: event.target.value,
+                        }))
+                      }
+                    />
+                  ) : (
+                    <p className={styles.analysisSummaryText}>{displayAnalysis.overview}</p>
+                  )}
                 </section>
 
                 <section className={styles.analysisRatioList}>
                   <article
                     className={`${styles.analysisRatioCard} ${styles.analysisRatioPositive}`}
-                    style={buildRatioCardStyle("90, 214, 142", analysis.positivePercent)}
+                    style={buildRatioCardStyle("90, 214, 142", displayAnalysis.positivePercent)}
                   >
                     <p>ポジティブ</p>
-                    <strong>{analysis.positivePercent}%</strong>
+                    <strong>{displayAnalysis.positivePercent}%</strong>
                   </article>
                   <article
                     className={`${styles.analysisRatioCard} ${styles.analysisRatioNeutral}`}
-                    style={buildRatioCardStyle("146, 178, 229", analysis.neutralPercent)}
+                    style={buildRatioCardStyle("146, 178, 229", displayAnalysis.neutralPercent)}
                   >
                     <p>中立</p>
-                    <strong>{analysis.neutralPercent}%</strong>
+                    <strong>{displayAnalysis.neutralPercent}%</strong>
                   </article>
                   <article
                     className={`${styles.analysisRatioCard} ${styles.analysisRatioNegative}`}
-                    style={buildRatioCardStyle("255, 125, 125", analysis.negativePercent)}
+                    style={buildRatioCardStyle("255, 125, 125", displayAnalysis.negativePercent)}
                   >
                     <p>ネガティブ</p>
-                    <strong>{analysis.negativePercent}%</strong>
+                    <strong>{displayAnalysis.negativePercent}%</strong>
                   </article>
                 </section>
 
                 <section className={styles.analysisSectionCard}>
-                  <h4>視聴者像</h4>
-                  <p>{analysis.audienceSummary}</p>
+                  <div className={styles.editableCardHeader}>
+                    <h4>視聴者像</h4>
+                  </div>
+                  {isSummaryEditing ? (
+                    <textarea
+                      className={styles.analysisTextarea}
+                      value={draftAnalysis?.audienceSummary ?? ""}
+                      onChange={(event) =>
+                        updateDraftAnalysis((current) => ({
+                          ...current,
+                          audienceSummary: event.target.value,
+                        }))
+                      }
+                    />
+                  ) : (
+                    <p>{displayAnalysis.audienceSummary}</p>
+                  )}
                 </section>
 
                 <section className={styles.analysisSectionCard}>
-                  <h4>視聴者心理</h4>
-                  <p>{analysis.psychologySummary}</p>
+                  <div className={styles.editableCardHeader}>
+                    <h4>視聴者心理</h4>
+                  </div>
+                  {isSummaryEditing ? (
+                    <textarea
+                      className={styles.analysisTextarea}
+                      value={draftAnalysis?.psychologySummary ?? ""}
+                      onChange={(event) =>
+                        updateDraftAnalysis((current) => ({
+                          ...current,
+                          psychologySummary: event.target.value,
+                        }))
+                      }
+                    />
+                  ) : (
+                    <p>{displayAnalysis.psychologySummary}</p>
+                  )}
                 </section>
 
                 <section className={styles.analysisSectionCard}>
-                  <h4>ポジティブ傾向</h4>
-                  <ul className={styles.analysisBulletList}>
-                    {analysis.positiveThemes.length > 0 ? (
-                      analysis.positiveThemes.map((theme, index) => <li key={`${theme}-${index}`}>{theme}</li>)
-                    ) : (
-                      <li>目立つ傾向はまだありません。</li>
-                    )}
-                  </ul>
+                  <div className={styles.editableCardHeader}>
+                    <h4>ポジティブ傾向</h4>
+                  </div>
+                  {isSummaryEditing ? (
+                    <textarea
+                      className={styles.analysisTextarea}
+                      value={(draftAnalysis?.positiveThemes ?? []).join("\n")}
+                      onChange={(event) =>
+                        updateDraftAnalysis((current) => ({
+                          ...current,
+                          positiveThemes: parseThemeLines(event.target.value),
+                        }))
+                      }
+                    />
+                  ) : (
+                    <ul className={styles.analysisBulletList}>
+                      {displayAnalysis.positiveThemes.length > 0 ? (
+                        displayAnalysis.positiveThemes.map((theme, index) => <li key={`${theme}-${index}`}>{theme}</li>)
+                      ) : (
+                        <li>目立つ傾向はまだありません。</li>
+                      )}
+                    </ul>
+                  )}
                 </section>
 
                 <section className={styles.analysisSectionCard}>
-                  <h4>ネガティブ傾向</h4>
-                  <ul className={styles.analysisBulletList}>
-                    {analysis.negativeThemes.length > 0 ? (
-                      analysis.negativeThemes.map((theme, index) => <li key={`${theme}-${index}`}>{theme}</li>)
-                    ) : (
-                      <li>目立つ傾向はまだありません。</li>
-                    )}
-                  </ul>
+                  <div className={styles.editableCardHeader}>
+                    <h4>ネガティブ傾向</h4>
+                  </div>
+                  {isSummaryEditing ? (
+                    <textarea
+                      className={styles.analysisTextarea}
+                      value={(draftAnalysis?.negativeThemes ?? []).join("\n")}
+                      onChange={(event) =>
+                        updateDraftAnalysis((current) => ({
+                          ...current,
+                          negativeThemes: parseThemeLines(event.target.value),
+                        }))
+                      }
+                    />
+                  ) : (
+                    <ul className={styles.analysisBulletList}>
+                      {displayAnalysis.negativeThemes.length > 0 ? (
+                        displayAnalysis.negativeThemes.map((theme, index) => <li key={`${theme}-${index}`}>{theme}</li>)
+                      ) : (
+                        <li>目立つ傾向はまだありません。</li>
+                      )}
+                    </ul>
+                  )}
                 </section>
+
+                {isSummaryEditing ? (
+                  <div className={styles.editActionRow}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (draftAnalysis) {
+                          void persistAnalysis(draftAnalysis);
+                        }
+                      }}
+                      disabled={!draftAnalysis || isSaving}
+                      className={styles.formatButton}
+                    >
+                      {isSaving ? "保存中..." : "保存"}
+                    </button>
+                    <button type="button" onClick={cancelSummaryEdit} className={styles.copyButton}>
+                      キャンセル
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </section>
@@ -436,14 +692,27 @@ export function CommentsWorkspace({
           <section className={styles.analysisCommentList}>
             {filteredItems.map((item) => {
               const comment = comments[item.commentIndex - 1];
+              const isEditingThis = editingCommentIndex === item.commentIndex && draftAnalysis !== null;
+              const editingItem = isEditingThis
+                ? draftAnalysis.items.find((candidate) => candidate.commentIndex === item.commentIndex) ?? item
+                : item;
 
               return (
                 <article key={`analysis-${item.commentIndex}`} className={styles.analysisCommentCard}>
                   <div className={styles.analysisCommentHeader}>
                     <p className={styles.commentAuthor}>{comment?.author || "投稿者不明"}</p>
-                    <span className={`${styles.sentimentBadge} ${styles[`sentiment${item.sentiment}`]}`}>
-                      {getSentimentLabel(item.sentiment)}
-                    </span>
+                    <div className={styles.analysisCommentActions}>
+                      <span className={`${styles.sentimentBadge} ${styles[`sentiment${editingItem.sentiment}`]}`}>
+                        {getSentimentLabel(editingItem.sentiment)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => startCommentEdit(item.commentIndex)}
+                        className={styles.iconButton}
+                      >
+                        編集
+                      </button>
+                    </div>
                   </div>
 
                   <div className={styles.commentBodyBlock}>
@@ -451,20 +720,126 @@ export function CommentsWorkspace({
                     <p className={styles.commentTextStrong}>{comment?.text || ""}</p>
                   </div>
 
-                  <dl className={styles.analysisDetailList}>
-                    <div>
-                      <dt>視聴者像</dt>
-                      <dd>{item.viewerType}</dd>
+                  {isEditingThis ? (
+                    <div className={styles.analysisEditForm}>
+                      <label className={styles.analysisField}>
+                        <span>感情タグ</span>
+                        <select
+                          className={styles.analysisSelect}
+                          value={editingItem.sentiment}
+                          onChange={(event) =>
+                            updateDraftAnalysis((current) => ({
+                              ...current,
+                              items: current.items.map((candidate) =>
+                                candidate.commentIndex === item.commentIndex
+                                  ? {
+                                      ...candidate,
+                                      sentiment: event.target.value as CommentSentiment,
+                                    }
+                                  : candidate,
+                              ),
+                            }))
+                          }
+                        >
+                          <option value="positive">ポジティブ</option>
+                          <option value="neutral">中立</option>
+                          <option value="negative">ネガティブ</option>
+                        </select>
+                      </label>
+                      <label className={styles.analysisField}>
+                        <span>視聴者像</span>
+                        <textarea
+                          className={styles.analysisTextarea}
+                          value={editingItem.viewerType}
+                          onChange={(event) =>
+                            updateDraftAnalysis((current) => ({
+                              ...current,
+                              items: current.items.map((candidate) =>
+                                candidate.commentIndex === item.commentIndex
+                                  ? {
+                                      ...candidate,
+                                      viewerType: event.target.value,
+                                    }
+                                  : candidate,
+                              ),
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className={styles.analysisField}>
+                        <span>心理</span>
+                        <textarea
+                          className={styles.analysisTextarea}
+                          value={editingItem.psychology}
+                          onChange={(event) =>
+                            updateDraftAnalysis((current) => ({
+                              ...current,
+                              items: current.items.map((candidate) =>
+                                candidate.commentIndex === item.commentIndex
+                                  ? {
+                                      ...candidate,
+                                      psychology: event.target.value,
+                                    }
+                                  : candidate,
+                              ),
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className={styles.analysisField}>
+                        <span>個別フィードバック</span>
+                        <textarea
+                          className={styles.analysisTextarea}
+                          value={editingItem.note}
+                          onChange={(event) =>
+                            updateDraftAnalysis((current) => ({
+                              ...current,
+                              items: current.items.map((candidate) =>
+                                candidate.commentIndex === item.commentIndex
+                                  ? {
+                                      ...candidate,
+                                      note: event.target.value,
+                                    }
+                                  : candidate,
+                              ),
+                            }))
+                          }
+                        />
+                      </label>
+                      <div className={styles.editActionRow}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (draftAnalysis) {
+                              void persistAnalysis(draftAnalysis);
+                            }
+                          }}
+                          disabled={!draftAnalysis || isSaving}
+                          className={styles.formatButton}
+                        >
+                          {isSaving ? "保存中..." : "保存"}
+                        </button>
+                        <button type="button" onClick={cancelCommentEdit} className={styles.copyButton}>
+                          キャンセル
+                        </button>
+                      </div>
                     </div>
-                    <div>
-                      <dt>心理</dt>
-                      <dd>{item.psychology}</dd>
-                    </div>
-                    <div>
-                      <dt>個別フィードバック</dt>
-                      <dd>{item.note}</dd>
-                    </div>
-                  </dl>
+                  ) : (
+                    <dl className={styles.analysisDetailList}>
+                      <div>
+                        <dt>視聴者像</dt>
+                        <dd>{item.viewerType}</dd>
+                      </div>
+                      <div>
+                        <dt>心理</dt>
+                        <dd>{item.psychology}</dd>
+                      </div>
+                      <div>
+                        <dt>個別フィードバック</dt>
+                        <dd>{item.note}</dd>
+                      </div>
+                    </dl>
+                  )}
                 </article>
               );
             })}

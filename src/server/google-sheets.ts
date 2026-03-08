@@ -6,6 +6,7 @@ import { google } from "googleapis";
 
 import type { CommentAnalysis } from "../domain/youtube/comment-analysis";
 import { BadRequestError, UpstreamServiceError } from "../domain/youtube/errors";
+import { parseStoredComments } from "../domain/youtube/stored-comment";
 import type { ExtractVideoResponse } from "../domain/youtube/types";
 
 const DEFAULT_CREDENTIALS_FILE = "gen-lang-client-0823751047-629dc32ab24d.json";
@@ -34,6 +35,11 @@ const COMMENT_DB_HEADER = [
   "comment_text",
   "likes",
   "created_at",
+  "sentiment",
+  "viewer_type",
+  "psychology",
+  "note",
+  "analysis_updated_at",
 ] as const;
 
 type SheetsExportPayload = {
@@ -325,7 +331,7 @@ async function ensureSheetWithHeader(
 ): Promise<void> {
   const metadata = await sheets.spreadsheets.get({
     spreadsheetId,
-    fields: "sheets(properties(sheetId,title))",
+    fields: "sheets(properties(sheetId,title,gridProperties(columnCount)))",
   });
   const existingSheet = metadata.data.sheets?.find((sheet) => sheet.properties?.title === title);
 
@@ -360,15 +366,39 @@ async function ensureSheetWithHeader(
     return;
   }
 
+  const currentColumnCount = existingSheet.properties?.gridProperties?.columnCount ?? 0;
+  if (currentColumnCount < header.length && typeof existingSheet.properties?.sheetId === "number") {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            updateSheetProperties: {
+              properties: {
+                sheetId: existingSheet.properties.sheetId,
+                gridProperties: {
+                  columnCount: header.length,
+                },
+              },
+              fields: "gridProperties.columnCount",
+            },
+          },
+        ],
+      },
+    });
+  }
+
   const headerRange = `${title}!A1:${toA1ColumnLabel(header.length)}1`;
   const headerResponse = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: headerRange,
   });
   const existingHeader = headerResponse.data.values?.[0] ?? [];
-  const hasAnyHeaderValue = existingHeader.some((value) => typeof value === "string" && value.trim().length > 0);
+  const hasSameHeader =
+    existingHeader.length >= header.length &&
+    header.every((value, index) => existingHeader[index] === value);
 
-  if (hasAnyHeaderValue) {
+  if (hasSameHeader) {
     return;
   }
 
@@ -398,6 +428,63 @@ function buildStoredContentRows(
     chunk,
     createdAt,
   ]);
+}
+
+type StoredCommentDbBase = {
+  scriptId: string;
+  videoId: string;
+  url: string;
+  title: string;
+  channelName?: string;
+  publishedAt?: string;
+  createdAt: string;
+};
+
+type StoredCommentDbComment = {
+  author: string;
+  text: string;
+  likes?: number;
+};
+
+type StoredCommentAnalysisValues = {
+  sentiment?: string;
+  viewerType?: string;
+  psychology?: string;
+  note?: string;
+  analysisUpdatedAt?: string;
+};
+
+function buildCommentAnalysisCells(values?: StoredCommentAnalysisValues): Array<string | number> {
+  return [
+    values?.sentiment ?? "",
+    values?.viewerType ?? "",
+    values?.psychology ?? "",
+    values?.note ?? "",
+    values?.analysisUpdatedAt ?? "",
+  ];
+}
+
+function buildStoredCommentDbRow(
+  script: StoredCommentDbBase,
+  comment: StoredCommentDbComment,
+  commentIndex: number,
+  analysisValues?: StoredCommentAnalysisValues,
+): Array<string | number> {
+  return [
+    `${script.scriptId}:${commentIndex}`,
+    script.scriptId,
+    script.videoId,
+    script.url,
+    script.title,
+    script.channelName ?? "",
+    script.publishedAt ?? "",
+    commentIndex,
+    comment.author,
+    comment.text,
+    typeof comment.likes === "number" ? comment.likes : "",
+    script.createdAt,
+    ...buildCommentAnalysisCells(analysisValues),
+  ];
 }
 
 async function deleteScriptRowsByType(
@@ -527,20 +614,129 @@ export function buildCommentDbRows(
     }
 
     return item.rawData.comments.map((comment, commentIndex) => [
-      `${reference.scriptId}:${commentIndex + 1}`,
-      reference.scriptId,
-      item.rawData.videoId,
-      item.rawData.url,
-      item.rawData.title,
-      item.rawData.channelName,
-      item.rawData.publishedAt,
-      commentIndex + 1,
-      comment.author,
-      comment.text,
-      comment.likes,
-      createdAt,
+      ...buildStoredCommentDbRow(
+        {
+          scriptId: reference.scriptId,
+          videoId: item.rawData.videoId,
+          url: item.rawData.url,
+          title: item.rawData.title,
+          channelName: item.rawData.channelName,
+          publishedAt: item.rawData.publishedAt,
+          createdAt,
+        },
+        comment,
+        commentIndex + 1,
+      ),
     ]);
   });
+}
+
+function buildCommentAnalysisMap(analysis: CommentAnalysis, updatedAt: string): Map<number, StoredCommentAnalysisValues> {
+  return new Map(
+    analysis.items.map((item) => [
+      item.commentIndex,
+      {
+        sentiment: item.sentiment,
+        viewerType: item.viewerType,
+        psychology: item.psychology,
+        note: item.note,
+        analysisUpdatedAt: updatedAt,
+      },
+    ]),
+  );
+}
+
+async function syncCommentAnalysisToCommentDb(
+  sheets: Awaited<ReturnType<typeof createSheetsClient>>,
+  spreadsheetId: string,
+  script: StoredCommentDbBase,
+  comments: StoredCommentDbComment[],
+  analysis: CommentAnalysis,
+): Promise<void> {
+  const commentDbSheetName = getCommentDbSheetName();
+  await ensureSheetWithHeader(sheets, spreadsheetId, commentDbSheetName, COMMENT_DB_HEADER);
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${commentDbSheetName}!A:Q`,
+  });
+  const rows = response.data.values ?? [];
+  const analysisUpdatedAt = new Date().toISOString();
+  const analysisMap = buildCommentAnalysisMap(analysis, analysisUpdatedAt);
+  const existingRows = rows
+    .map((row, index) => ({ row, rowNumber: index + 1 }))
+    .filter((entry) => entry.rowNumber > 1 && entry.row[1] === script.scriptId);
+
+  for (const entry of existingRows) {
+    const commentIndex = Number(entry.row[7] ?? "0");
+    const values = buildCommentAnalysisCells(analysisMap.get(commentIndex));
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${commentDbSheetName}!M${entry.rowNumber}:Q${entry.rowNumber}`,
+      valueInputOption: "RAW",
+      requestBody: {
+        values: [values],
+      },
+    });
+  }
+
+  const existingCommentIndexes = new Set(
+    existingRows
+      .map((entry) => Number(entry.row[7] ?? "0"))
+      .filter((commentIndex) => Number.isInteger(commentIndex) && commentIndex > 0),
+  );
+  const missingRows = comments.flatMap((comment, index) => {
+    const commentIndex = index + 1;
+    if (existingCommentIndexes.has(commentIndex)) {
+      return [];
+    }
+
+    return [
+      buildStoredCommentDbRow(script, comment, commentIndex, analysisMap.get(commentIndex)),
+    ];
+  });
+
+  if (missingRows.length > 0) {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${commentDbSheetName}!A:Q`,
+      valueInputOption: "RAW",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: {
+        values: missingRows,
+      },
+    });
+  }
+}
+
+async function clearCommentAnalysisFromCommentDb(
+  sheets: Awaited<ReturnType<typeof createSheetsClient>>,
+  spreadsheetId: string,
+  scriptId: string,
+): Promise<void> {
+  const commentDbSheetName = getCommentDbSheetName();
+  await ensureSheetWithHeader(sheets, spreadsheetId, commentDbSheetName, COMMENT_DB_HEADER);
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${commentDbSheetName}!A:Q`,
+  });
+  const rows = response.data.values ?? [];
+  const matchingRowNumbers = rows
+    .map((row, index) => ({ row, rowNumber: index + 1 }))
+    .filter((entry) => entry.rowNumber > 1 && entry.row[1] === scriptId)
+    .map((entry) => entry.rowNumber);
+
+  for (const rowNumber of matchingRowNumbers) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${commentDbSheetName}!M${rowNumber}:Q${rowNumber}`,
+      valueInputOption: "RAW",
+      requestBody: {
+        values: [["", "", "", "", ""]],
+      },
+    });
+  }
 }
 
 async function createSheetsClient() {
@@ -601,7 +797,7 @@ export async function appendAiExtractRows(
     await ensureSheetWithHeader(sheets, spreadsheetId, commentDbSheetName, COMMENT_DB_HEADER);
     await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: `${commentDbSheetName}!A:L`,
+      range: `${commentDbSheetName}!A:Q`,
       valueInputOption: "RAW",
       insertDataOption: "INSERT_ROWS",
       requestBody: {
@@ -713,6 +909,34 @@ export async function saveStoredCommentAnalysis(scriptId: string, analysis: Comm
       values: payloadRows,
     },
   });
+
+  const metadata = parseStoredMeta(metaRow[6]);
+  const comments = parseStoredComments(
+    scriptRows
+      .filter((row) => row[4] === "comments")
+      .sort((left, right) => Number(left[5] ?? "0") - Number(right[5] ?? "0"))
+      .map((row) => row[6] ?? "")
+      .join(""),
+  ).map((comment) => ({
+    author: comment.author,
+    text: comment.text,
+  }));
+
+  await syncCommentAnalysisToCommentDb(
+    sheets,
+    spreadsheetId,
+    {
+      scriptId,
+      videoId: metaRow[1] ?? "",
+      url: metaRow[2] ?? "",
+      title: metaRow[3] ?? "",
+      channelName: metadata.channelName,
+      publishedAt: metadata.publishedAt,
+      createdAt: metaRow[7] ?? new Date().toISOString(),
+    },
+    comments,
+    analysis,
+  );
 }
 
 export async function deleteStoredCommentAnalysis(scriptId: string): Promise<void> {
@@ -723,4 +947,5 @@ export async function deleteStoredCommentAnalysis(scriptId: string): Promise<voi
   const sheets = await createSheetsClient();
   const spreadsheetId = getSpreadsheetId();
   await deleteScriptRowsByType(sheets, spreadsheetId, scriptId, "comment_analysis");
+  await clearCommentAnalysisFromCommentDb(sheets, spreadsheetId, scriptId);
 }

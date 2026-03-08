@@ -216,6 +216,11 @@ describe("buildCommentDbRows", () => {
         "first",
         1,
         "2026-03-07T00:00:00.000Z",
+        "",
+        "",
+        "",
+        "",
+        "",
       ],
       [
         "abc123-script:2",
@@ -230,6 +235,11 @@ describe("buildCommentDbRows", () => {
         "second",
         2,
         "2026-03-07T00:00:00.000Z",
+        "",
+        "",
+        "",
+        "",
+        "",
       ],
     ]);
   });

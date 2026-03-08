@@ -127,7 +127,7 @@ describe("appendAiExtractRows", () => {
       .mockResolvedValueOnce({
         data: {
           updates: {
-            updatedRange: "AI抽出!A2:K2",
+            updatedRange: "動画分析!A2:K2",
           },
         },
       });
@@ -138,7 +138,7 @@ describe("appendAiExtractRows", () => {
             {
               properties: {
                 sheetId: 916855654,
-                title: "AI抽出",
+                title: "動画分析",
               },
             },
             {
@@ -153,7 +153,7 @@ describe("appendAiExtractRows", () => {
             {
               properties: {
                 sheetId: 987654321,
-                title: "コメントシート",
+                title: "コメント分析",
                 gridProperties: {
                   columnCount: 11,
                 },
@@ -168,7 +168,7 @@ describe("appendAiExtractRows", () => {
             {
               properties: {
                 sheetId: 916855654,
-                title: "AI抽出",
+                title: "動画分析",
               },
             },
             {
@@ -183,7 +183,7 @@ describe("appendAiExtractRows", () => {
             {
               properties: {
                 sheetId: 987654321,
-                title: "コメントシート",
+                title: "コメント分析",
                 gridProperties: {
                   columnCount: 11,
                 },
@@ -198,7 +198,7 @@ describe("appendAiExtractRows", () => {
             {
               properties: {
                 sheetId: 916855654,
-                title: "AI抽出",
+                title: "動画分析",
               },
             },
           ],
@@ -258,7 +258,7 @@ describe("appendAiExtractRows", () => {
       3,
       expect.objectContaining({
         spreadsheetId: "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME",
-        range: "コメントシート!A:K",
+        range: "コメント分析!A:K",
       }),
     );
 
@@ -266,7 +266,7 @@ describe("appendAiExtractRows", () => {
     expect(fourthCall).toEqual(
       expect.objectContaining({
         spreadsheetId: "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME",
-        range: "AI抽出!A:K",
+        range: "動画分析!A:K",
       }),
     );
     expect(fourthCall?.requestBody?.values?.[0]?.[9]).toMatch(/^=HYPERLINK\("https:\/\/example\.com\/scripts\//);
@@ -280,7 +280,7 @@ describe("appendAiExtractRows", () => {
     });
     expect(valueGetMock).toHaveBeenNthCalledWith(2, {
       spreadsheetId: "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME",
-      range: "コメントシート!A1:K1",
+      range: "コメント分析!A1:K1",
     });
     expect(valueUpdateMock).toHaveBeenNthCalledWith(1, {
       spreadsheetId: "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME",
@@ -292,7 +292,7 @@ describe("appendAiExtractRows", () => {
     });
     expect(valueUpdateMock).toHaveBeenNthCalledWith(2, {
       spreadsheetId: "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME",
-      range: "コメントシート!A1:K1",
+      range: "コメント分析!A1:K1",
       valueInputOption: "RAW",
       requestBody: {
         values: [commentSheetHeader],
@@ -364,7 +364,7 @@ describe("appendAiExtractRows", () => {
       .mockResolvedValueOnce({
         data: {
           updates: {
-            updatedRange: "AI抽出!A2:K2",
+            updatedRange: "動画分析!A2:K2",
           },
         },
       });
@@ -375,7 +375,7 @@ describe("appendAiExtractRows", () => {
             {
               properties: {
                 sheetId: 916855654,
-                title: "AI抽出",
+                title: "動画分析",
               },
             },
           ],
@@ -387,7 +387,7 @@ describe("appendAiExtractRows", () => {
             {
               properties: {
                 sheetId: 916855654,
-                title: "AI抽出",
+                title: "動画分析",
               },
             },
           ],
@@ -399,7 +399,7 @@ describe("appendAiExtractRows", () => {
             {
               properties: {
                 sheetId: 916855654,
-                title: "AI抽出",
+                title: "動画分析",
               },
             },
           ],
@@ -447,7 +447,7 @@ describe("appendAiExtractRows", () => {
             {
               addSheet: {
                 properties: {
-                  title: "コメントシート",
+                  title: "コメント分析",
                   gridProperties: {
                     rowCount: 1000,
                     columnCount: 11,
@@ -469,7 +469,7 @@ describe("appendAiExtractRows", () => {
     });
     expect(valueUpdateMock).toHaveBeenNthCalledWith(2, {
       spreadsheetId: "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME",
-      range: "コメントシート!A1:K1",
+      range: "コメント分析!A1:K1",
       valueInputOption: "RAW",
       requestBody: {
         values: [commentSheetHeader],
@@ -479,7 +479,7 @@ describe("appendAiExtractRows", () => {
 });
 
 describe("comment analysis sheet sync", () => {
-  it("writes per-comment analysis columns into コメントDB and コメントシート on save", async () => {
+  it("writes per-comment analysis columns into コメントDB and コメント分析 on save", async () => {
     valueGetMock
       .mockResolvedValueOnce({
         data: {
@@ -553,7 +553,7 @@ describe("comment analysis sheet sync", () => {
           {
             properties: {
               sheetId: 987654321,
-              title: "コメントシート",
+              title: "コメント分析",
               gridProperties: {
                 columnCount: 11,
               },
@@ -615,7 +615,7 @@ describe("comment analysis sheet sync", () => {
     expect(valueUpdateMock).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        range: "コメントシート!G2:K2",
+        range: "コメント分析!G2:K2",
         valueInputOption: "RAW",
         requestBody: {
           values: [[
@@ -630,7 +630,7 @@ describe("comment analysis sheet sync", () => {
     );
   });
 
-  it("clears per-comment analysis columns in コメントDB and コメントシート on delete", async () => {
+  it("clears per-comment analysis columns in コメントDB and コメント分析 on delete", async () => {
     valueGetMock
       .mockResolvedValueOnce({
         data: {
@@ -708,7 +708,7 @@ describe("comment analysis sheet sync", () => {
           {
             properties: {
               sheetId: 987654321,
-              title: "コメントシート",
+              title: "コメント分析",
               gridProperties: {
                 columnCount: 11,
               },
@@ -738,7 +738,7 @@ describe("comment analysis sheet sync", () => {
     expect(valueUpdateMock).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        range: "コメントシート!G2:K2",
+        range: "コメント分析!G2:K2",
         valueInputOption: "RAW",
         requestBody: {
           values: [["", "", "", "", ""]],

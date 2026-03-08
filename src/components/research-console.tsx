@@ -249,7 +249,7 @@ export function ResearchConsole({ design }: { design: PencilConsoleDesign }): Re
         }>(response);
         const detailMessage = data.detailLinksEnabled ? "台本リンク付きで" : "台本本文を保存しつつ";
         setSheetMessage(
-          `${formatCount(data.appendedRows)}件を ${detailMessage} AI抽出 シートへ反映しました。台本DB には ${formatCount(data.storedScriptRows)} 行、コメントDB には ${formatCount(data.storedCommentRows)} 行、コメントシートには ${formatCount(data.storedCommentSheetRows)} 行を追加しました。`,
+          `${formatCount(data.appendedRows)}件を ${detailMessage} 動画分析 シートへ反映しました。台本DB には ${formatCount(data.storedScriptRows)} 行、コメントDB には ${formatCount(data.storedCommentRows)} 行、コメント分析には ${formatCount(data.storedCommentSheetRows)} 行を追加しました。`,
         );
       } catch (error) {
         setSheetMessage(error instanceof Error ? error.message : "スプレッドシート反映に失敗しました");
@@ -444,7 +444,7 @@ export function ResearchConsole({ design }: { design: PencilConsoleDesign }): Re
                     onClick={handleExportToSheets}
                     type="button"
                   >
-                    {isExportingToSheets ? "反映中..." : "AI抽出へ反映"}
+                    {isExportingToSheets ? "反映中..." : "動画分析へ反映"}
                   </button>
                   {sheetMessage ? <p className={styles.captionText}>{sheetMessage}</p> : null}
                 </div>

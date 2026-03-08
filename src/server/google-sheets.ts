@@ -11,10 +11,10 @@ import type { ExtractVideoResponse } from "../domain/youtube/types";
 
 const DEFAULT_CREDENTIALS_FILE = "gen-lang-client-0823751047-629dc32ab24d.json";
 const DEFAULT_SPREADSHEET_ID = "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME";
-const DEFAULT_SHEET_NAME = "AI抽出";
+const DEFAULT_SHEET_NAME = "動画分析";
 const DEFAULT_SCRIPT_DB_SHEET_NAME = "台本DB";
 const DEFAULT_COMMENT_DB_SHEET_NAME = "コメントDB";
-const DEFAULT_COMMENT_SHEET_NAME = "コメントシート";
+const DEFAULT_COMMENT_SHEET_NAME = "コメント分析";
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 const MAX_CELL_TEXT_LENGTH = 40000;
 const GOOGLE_CREDENTIALS_JSON_ENV = "GOOGLE_APPLICATION_CREDENTIALS_JSON";
@@ -111,6 +111,10 @@ function getConfiguredValue(name: string, fallback: string): string {
   return normalizeEnvValue(process.env[name]) || fallback;
 }
 
+function normalizeLegacySheetName(value: string, currentName: string, legacyName: string): string {
+  return value === legacyName ? currentName : value;
+}
+
 function getCredentialsPath(): string {
   return normalizeEnvValue(process.env.GOOGLE_APPLICATION_CREDENTIALS) || join(process.cwd(), DEFAULT_CREDENTIALS_FILE);
 }
@@ -120,7 +124,11 @@ function getSpreadsheetId(): string {
 }
 
 function getSheetName(): string {
-  return getConfiguredValue("GOOGLE_SHEETS_SHEET_NAME", DEFAULT_SHEET_NAME);
+  return normalizeLegacySheetName(
+    getConfiguredValue("GOOGLE_SHEETS_SHEET_NAME", DEFAULT_SHEET_NAME),
+    DEFAULT_SHEET_NAME,
+    "AI抽出",
+  );
 }
 
 function getScriptDbSheetName(): string {
@@ -132,7 +140,11 @@ function getCommentDbSheetName(): string {
 }
 
 function getCommentSheetName(): string {
-  return getConfiguredValue("GOOGLE_SHEETS_COMMENT_SHEET_NAME", DEFAULT_COMMENT_SHEET_NAME);
+  return normalizeLegacySheetName(
+    getConfiguredValue("GOOGLE_SHEETS_COMMENT_SHEET_NAME", DEFAULT_COMMENT_SHEET_NAME),
+    DEFAULT_COMMENT_SHEET_NAME,
+    "コメントシート",
+  );
 }
 
 function normalizeBaseUrl(value?: string): string {
@@ -283,7 +295,7 @@ async function resizeAiExtractThumbnailArea(
   const sheetId = sheetResponse.data.sheets?.find((sheet) => sheet.properties?.title === sheetName)?.properties?.sheetId;
 
   if (typeof sheetId !== "number") {
-    throw new UpstreamServiceError("AI抽出シートが見つかりません。");
+    throw new UpstreamServiceError("動画分析シートが見つかりません。");
   }
 
   await sheets.spreadsheets.batchUpdate({

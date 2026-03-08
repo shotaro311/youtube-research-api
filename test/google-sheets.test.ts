@@ -4,7 +4,7 @@ import { buildAiExtractSheetRows, buildCommentDbRows, buildCommentSheetRows, bui
 import type { ExtractVideoResponse } from "../src/domain/youtube/types";
 
 describe("buildAiExtractSheetRows", () => {
-  it("maps extract results to the AI抽出 sheet columns", () => {
+  it("maps extract results to the 動画分析 sheet columns", () => {
     const items: ExtractVideoResponse[] = [
       {
         rawData: {

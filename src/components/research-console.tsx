@@ -293,17 +293,6 @@ export function ResearchConsole({ design }: { design: PencilConsoleDesign }): Re
           </div>
 
           <form className={styles.formStack} onSubmit={handleSourceSubmit}>
-            <label className={styles.cardField}>
-              <span className={styles.cardLabel}>{design.resolver.inputLabel}</span>
-              <input
-                className={styles.cardInput}
-                value={sourceUrl}
-                onChange={(event) => setSourceUrl(event.target.value)}
-                placeholder={design.resolver.inputPlaceholder}
-                autoComplete="off"
-              />
-            </label>
-
             <div className={styles.actionRow}>
               <div className={styles.actionButtonWrap}>
                 <button
@@ -326,6 +315,17 @@ export function ResearchConsole({ design }: { design: PencilConsoleDesign }): Re
                 {design.resolver.sendLabel}
               </button>
             </div>
+
+            <label className={styles.cardField}>
+              <span className={styles.cardLabel}>{design.resolver.inputLabel}</span>
+              <input
+                className={styles.cardInput}
+                value={sourceUrl}
+                onChange={(event) => setSourceUrl(event.target.value)}
+                placeholder={design.resolver.inputPlaceholder}
+                autoComplete="off"
+              />
+            </label>
           </form>
 
           {sourceError ? <p className={styles.errorText}>{sourceError}</p> : null}
@@ -385,17 +385,6 @@ export function ResearchConsole({ design }: { design: PencilConsoleDesign }): Re
           </div>
 
           <form className={styles.formStack} onSubmit={handleVideoSubmit}>
-            <label className={styles.cardField}>
-              <span className={styles.cardLabel}>{design.extractor.inputLabel}</span>
-              <textarea
-                className={styles.cardTextarea}
-                value={videoUrlsText}
-                onChange={(event) => setVideoUrlsText(event.target.value)}
-                placeholder={design.extractor.inputPlaceholder}
-                spellCheck={false}
-              />
-            </label>
-
             <div className={styles.actionRow}>
               <div className={styles.actionButtonWrap}>
                 <button
@@ -418,6 +407,17 @@ export function ResearchConsole({ design }: { design: PencilConsoleDesign }): Re
                 {design.extractor.commentOnlyLabel}
               </button>
             </div>
+
+            <label className={styles.cardField}>
+              <span className={styles.cardLabel}>{design.extractor.inputLabel}</span>
+              <textarea
+                className={styles.cardTextarea}
+                value={videoUrlsText}
+                onChange={(event) => setVideoUrlsText(event.target.value)}
+                placeholder={design.extractor.inputPlaceholder}
+                spellCheck={false}
+              />
+            </label>
           </form>
 
           {videoError ? <p className={styles.errorText}>{videoError}</p> : null}

@@ -6,7 +6,7 @@ import type React from "react";
 import type { CommentAnalysis } from "../../../src/domain/youtube/comment-analysis";
 import type { StoredComment } from "../../../src/domain/youtube/stored-comment";
 import { CommentsWorkspace } from "./comments-analysis-panel";
-import { TranscriptWorkspace } from "./formatted-transcript-panel";
+import { TranscriptWorkspace } from "./transcript-analysis-panel";
 import styles from "./page.module.css";
 
 type ViewerTab = "transcript" | "comments";

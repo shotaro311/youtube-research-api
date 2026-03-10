@@ -76,6 +76,16 @@ function findSendableUrl(value: string): string {
   return parseEditableUrls(value)[0] ?? "";
 }
 
+function downloadJsonFile(fileName: string, payload: unknown): void {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const blobUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(blobUrl);
+}
+
 function toThemeStyle(design: PencilConsoleDesign): React.CSSProperties {
   const { layout, theme } = design;
 
@@ -490,6 +500,24 @@ export function ResearchConsole({ design }: { design: PencilConsoleDesign }): Re
     })();
   }
 
+  function handleDownloadAllJson(): void {
+    if (successfulResults.length === 0) {
+      setSheetMessage("JSONを出力できる抽出結果がありません。");
+      return;
+    }
+
+    downloadJsonFile("youtube-extract-results.json", {
+      exportedAt: new Date().toISOString(),
+      count: successfulResults.length,
+      items: successfulResults,
+    });
+  }
+
+  function handleDownloadSingleJson(result: ExtractVideoResponse): void {
+    const safeVideoId = result.rawData.videoId || "video";
+    downloadJsonFile(`${safeVideoId}.json`, result);
+  }
+
   function handleAnalyzeCard(index: number, kind: AnalysisKind): void {
     const targetCard = videoResults[index];
     const result = targetCard?.result;
@@ -785,14 +813,24 @@ export function ResearchConsole({ design }: { design: PencilConsoleDesign }): Re
                   {lastExtractionMode === "comments-only" ? "コメントのみ" : "通常抽出"}
                 </p>
                 <div className={styles.summaryActions}>
-                  <button
-                    className={styles.secondaryButton}
-                    disabled={isExportingToSheets || pendingCount > 0 || successfulResults.length === 0}
-                    onClick={handleExportToSheets}
-                    type="button"
-                  >
-                    {isExportingToSheets ? "反映中..." : "動画分析へ反映"}
-                  </button>
+                  <div className={styles.summaryActionButtons}>
+                    <button
+                      className={styles.secondaryButton}
+                      disabled={isExportingToSheets || pendingCount > 0 || successfulResults.length === 0}
+                      onClick={handleExportToSheets}
+                      type="button"
+                    >
+                      {isExportingToSheets ? "反映中..." : "動画分析へ反映"}
+                    </button>
+                    <button
+                      className={styles.tertiaryButton}
+                      disabled={pendingCount > 0 || successfulResults.length === 0}
+                      onClick={handleDownloadAllJson}
+                      type="button"
+                    >
+                      JSON一括DL
+                    </button>
+                  </div>
                   {sheetMessage ? <p className={styles.captionText}>{sheetMessage}</p> : null}
                 </div>
               </>
@@ -868,6 +906,20 @@ export function ResearchConsole({ design }: { design: PencilConsoleDesign }): Re
                             <p className={styles.statusLine}>
                               comments: {summarizeDiagnostics(item.result.diagnostics.comments)}
                             </p>
+                          </div>
+
+                          <div className={styles.resultMetaActions}>
+                            <button
+                              className={styles.tertiaryButton}
+                              type="button"
+                              onClick={() => {
+                                if (item.result) {
+                                  handleDownloadSingleJson(item.result);
+                                }
+                              }}
+                            >
+                              JSON保存
+                            </button>
                           </div>
 
                           <div className={styles.previewStack}>

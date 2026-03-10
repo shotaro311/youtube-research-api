@@ -232,6 +232,13 @@
   justify-items: start;
 }
 
+.summaryActionButtons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .actionButtonWrap {
   display: grid;
   gap: 8px;
@@ -642,6 +649,11 @@
   padding: 0 16px 16px;
 }
 
+.resultMetaActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .resultUrl {
   margin: 0;
   color: var(--console-input-text);
@@ -772,6 +784,11 @@
   .primaryButton,
   .secondaryButton,
   .tertiaryButton {
+    width: 100%;
+  }
+
+  .summaryActionButtons,
+  .resultMetaActions {
     width: 100%;
   }
 

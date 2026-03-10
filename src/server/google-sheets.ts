@@ -486,8 +486,31 @@ type StoredCommentAnalysisValues = {
   analysisUpdatedAt?: string;
 };
 
+type StoredCommentAnalysisLookup = Map<string, StoredCommentAnalysisValues>;
+
 function buildCommentId(scriptId: string, commentIndex: number): string {
   return `${scriptId}:${commentIndex}`;
+}
+
+function hasStoredCommentAnalysis(values?: StoredCommentAnalysisValues): boolean {
+  if (!values) {
+    return false;
+  }
+
+  return Boolean(
+    values.sentiment ||
+      values.viewerType ||
+      values.psychology ||
+      values.note ||
+      values.analysisUpdatedAt,
+  );
+}
+
+function buildStoredCommentAnalysisLookupKey(
+  videoId: string,
+  comment: Pick<StoredCommentDbComment, "author" | "text">,
+): string {
+  return JSON.stringify([videoId, comment.author.trim(), comment.text.trim()]);
 }
 
 function buildCommentAnalysisCells(values?: StoredCommentAnalysisValues): Array<string | number> {
@@ -659,6 +682,7 @@ export function buildCommentDbRows(
   items: ExtractVideoResponse[],
   references: ScriptReference[],
   createdAt = new Date().toISOString(),
+  analysisLookup?: StoredCommentAnalysisLookup,
 ): Array<Array<string | number>> {
   return items.flatMap((item, index) => {
     const reference = references[index];
@@ -679,6 +703,7 @@ export function buildCommentDbRows(
         },
         comment,
         commentIndex + 1,
+        analysisLookup?.get(buildStoredCommentAnalysisLookupKey(item.rawData.videoId, comment)),
       ),
     ]);
   });
@@ -687,6 +712,7 @@ export function buildCommentDbRows(
 export function buildCommentSheetRows(
   items: ExtractVideoResponse[],
   references: ScriptReference[],
+  analysisLookup?: StoredCommentAnalysisLookup,
 ): Array<Array<string | number>> {
   return items.flatMap((item, index) => {
     const reference = references[index];
@@ -704,9 +730,57 @@ export function buildCommentSheetRows(
         },
         comment,
         commentIndex + 1,
+        analysisLookup?.get(buildStoredCommentAnalysisLookupKey(item.rawData.videoId, comment)),
       ),
     );
   });
+}
+
+async function buildExistingCommentAnalysisLookup(
+  sheets: Awaited<ReturnType<typeof createSheetsClient>>,
+  spreadsheetId: string,
+  commentDbSheetName: string,
+  videoIds: string[],
+): Promise<StoredCommentAnalysisLookup> {
+  if (videoIds.length === 0) {
+    return new Map();
+  }
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${commentDbSheetName}!A:Q`,
+  });
+  const rows = response.data.values ?? [];
+  const targetVideoIds = new Set(videoIds);
+  const analysisLookup: StoredCommentAnalysisLookup = new Map();
+
+  for (const row of rows.slice(1)) {
+    const videoId = row[2] ?? "";
+    if (!targetVideoIds.has(videoId)) {
+      continue;
+    }
+
+    const analysisValues: StoredCommentAnalysisValues = {
+      sentiment: row[12] ?? "",
+      viewerType: row[13] ?? "",
+      psychology: row[14] ?? "",
+      note: row[15] ?? "",
+      analysisUpdatedAt: row[16] ?? "",
+    };
+    if (!hasStoredCommentAnalysis(analysisValues)) {
+      continue;
+    }
+
+    analysisLookup.set(
+      buildStoredCommentAnalysisLookupKey(videoId, {
+        author: row[8] ?? "",
+        text: row[9] ?? "",
+      }),
+      analysisValues,
+    );
+  }
+
+  return analysisLookup;
 }
 
 function buildCommentAnalysisMap(analysis: CommentAnalysis, updatedAt: string): Map<number, StoredCommentAnalysisValues> {
@@ -960,8 +1034,25 @@ export async function appendAiExtractRows(
   const spreadsheetId = getSpreadsheetId();
   const references = buildScriptReferences(payload.items, payload.viewerBaseUrl);
   const scriptRows = buildScriptDbRows(payload.items, references);
-  const commentRows = buildCommentDbRows(payload.items, references);
-  const commentSheetRows = buildCommentSheetRows(payload.items, references);
+  const hasAnyComments = payload.items.some((item) => item.rawData.comments.length > 0);
+  const commentDbSheetName = getCommentDbSheetName();
+  let existingCommentAnalysisLookup = new Map<string, StoredCommentAnalysisValues>();
+  if (hasAnyComments) {
+    await ensureSheetWithHeader(sheets, spreadsheetId, commentDbSheetName, COMMENT_DB_HEADER);
+    existingCommentAnalysisLookup = await buildExistingCommentAnalysisLookup(
+      sheets,
+      spreadsheetId,
+      commentDbSheetName,
+      payload.items.map((item) => item.rawData.videoId),
+    );
+  }
+  const commentRows = buildCommentDbRows(
+    payload.items,
+    references,
+    new Date().toISOString(),
+    existingCommentAnalysisLookup,
+  );
+  const commentSheetRows = buildCommentSheetRows(payload.items, references, existingCommentAnalysisLookup);
   const rows = buildAiExtractSheetRows(payload.items, references);
 
   if (scriptRows.length > 0) {
@@ -977,8 +1068,6 @@ export async function appendAiExtractRows(
   }
 
   if (commentRows.length > 0) {
-    const commentDbSheetName = getCommentDbSheetName();
-    await ensureSheetWithHeader(sheets, spreadsheetId, commentDbSheetName, COMMENT_DB_HEADER);
     await sheets.spreadsheets.values.append({
       spreadsheetId,
       range: `${commentDbSheetName}!A:Q`,

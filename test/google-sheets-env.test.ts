@@ -214,6 +214,11 @@ describe("appendAiExtractRows", () => {
         data: {
           values: [],
         },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          values: [],
+        },
       });
     valueUpdateMock.mockResolvedValue({});
     batchUpdateMock.mockResolvedValue({});
@@ -279,6 +284,10 @@ describe("appendAiExtractRows", () => {
       range: "コメントDB!A1:Q1",
     });
     expect(valueGetMock).toHaveBeenNthCalledWith(2, {
+      spreadsheetId: "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME",
+      range: "コメントDB!A:Q",
+    });
+    expect(valueGetMock).toHaveBeenNthCalledWith(3, {
       spreadsheetId: "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME",
       range: "コメント分析!A1:K1",
     });
@@ -356,6 +365,159 @@ describe("appendAiExtractRows", () => {
     });
   });
 
+  it("reuses existing analyzed comment data when exporting to sheets", async () => {
+    appendMock
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        data: {
+          updates: {
+            updatedRange: "動画分析!A2:K2",
+          },
+        },
+      });
+    spreadsheetGetMock
+      .mockResolvedValueOnce({
+        data: {
+          sheets: [
+            {
+              properties: {
+                sheetId: 916855654,
+                title: "動画分析",
+              },
+            },
+            {
+              properties: {
+                sheetId: 123456789,
+                title: "コメントDB",
+                gridProperties: {
+                  columnCount: 17,
+                },
+              },
+            },
+            {
+              properties: {
+                sheetId: 987654321,
+                title: "コメント分析",
+                gridProperties: {
+                  columnCount: 11,
+                },
+              },
+            },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          sheets: [
+            {
+              properties: {
+                sheetId: 916855654,
+                title: "動画分析",
+              },
+            },
+            {
+              properties: {
+                sheetId: 123456789,
+                title: "コメントDB",
+                gridProperties: {
+                  columnCount: 17,
+                },
+              },
+            },
+            {
+              properties: {
+                sheetId: 987654321,
+                title: "コメント分析",
+                gridProperties: {
+                  columnCount: 11,
+                },
+              },
+            },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          sheets: [
+            {
+              properties: {
+                sheetId: 916855654,
+                title: "動画分析",
+              },
+            },
+          ],
+        },
+      });
+    valueGetMock
+      .mockResolvedValueOnce({
+        data: {
+          values: [commentDbHeader],
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          values: [
+            commentDbHeader,
+            [
+              "old-script:1",
+              "old-script",
+              "abc123",
+              "https://www.youtube.com/watch?v=abc123",
+              "Test Title",
+              "Test Channel",
+              "2024-01-01T00:00:00Z",
+              "1",
+              "a",
+              "b",
+              "1",
+              "2026-03-01T00:00:00.000Z",
+              "positive",
+              "視聴者像",
+              "心理",
+              "メモ",
+              "2026-03-09T00:00:00.000Z",
+            ],
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          values: [commentSheetHeader],
+        },
+      });
+    valueUpdateMock.mockResolvedValue({});
+    batchUpdateMock.mockResolvedValue({});
+    process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON = JSON.stringify({
+      client_email: "service-account@example.com",
+      private_key: "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n",
+    });
+
+    await appendAiExtractRows({
+      items: [item],
+      viewerBaseUrl: "https://example.com/",
+    });
+
+    const commentDbAppendCall = appendMock.mock.calls[1]?.[0];
+    const commentSheetAppendCall = appendMock.mock.calls[2]?.[0];
+
+    expect(commentDbAppendCall?.requestBody?.values?.[0]?.slice(12, 17)).toEqual([
+      "positive",
+      "視聴者像",
+      "心理",
+      "メモ",
+      "2026-03-09T00:00:00.000Z",
+    ]);
+    expect(commentSheetAppendCall?.requestBody?.values?.[0]?.slice(6, 11)).toEqual([
+      "positive",
+      "視聴者像",
+      "心理",
+      "メモ",
+      "2026-03-09T00:00:00.000Z",
+    ]);
+  });
+
   it("creates the comment sheets when they do not exist yet", async () => {
     appendMock
       .mockResolvedValueOnce({})
@@ -405,6 +567,11 @@ describe("appendAiExtractRows", () => {
           ],
         },
       });
+    valueGetMock.mockResolvedValueOnce({
+      data: {
+        values: [commentDbHeader],
+      },
+    });
     valueUpdateMock.mockResolvedValue({});
     batchUpdateMock.mockResolvedValue({});
     process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON = JSON.stringify({
@@ -459,7 +626,7 @@ describe("appendAiExtractRows", () => {
         },
       }),
     );
-    expect(valueUpdateMock).toHaveBeenNthCalledWith(1, {
+    expect(valueUpdateMock).toHaveBeenCalledWith({
       spreadsheetId: "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME",
       range: "コメントDB!A1:Q1",
       valueInputOption: "RAW",
@@ -467,7 +634,7 @@ describe("appendAiExtractRows", () => {
         values: [commentDbHeader],
       },
     });
-    expect(valueUpdateMock).toHaveBeenNthCalledWith(2, {
+    expect(valueUpdateMock).toHaveBeenCalledWith({
       spreadsheetId: "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME",
       range: "コメント分析!A1:K1",
       valueInputOption: "RAW",
@@ -596,8 +763,7 @@ describe("comment analysis sheet sync", () => {
         range: "台本DB!A:H",
       }),
     );
-    expect(valueUpdateMock).toHaveBeenNthCalledWith(
-      1,
+    expect(valueUpdateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         range: "コメントDB!M2:Q2",
         valueInputOption: "RAW",
@@ -612,8 +778,7 @@ describe("comment analysis sheet sync", () => {
         },
       }),
     );
-    expect(valueUpdateMock).toHaveBeenNthCalledWith(
-      2,
+    expect(valueUpdateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         range: "コメント分析!G2:K2",
         valueInputOption: "RAW",
@@ -725,8 +890,7 @@ describe("comment analysis sheet sync", () => {
 
     await deleteStoredCommentAnalysis("script-1");
 
-    expect(valueUpdateMock).toHaveBeenNthCalledWith(
-      1,
+    expect(valueUpdateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         range: "コメントDB!M2:Q2",
         valueInputOption: "RAW",
@@ -735,8 +899,7 @@ describe("comment analysis sheet sync", () => {
         },
       }),
     );
-    expect(valueUpdateMock).toHaveBeenNthCalledWith(
-      2,
+    expect(valueUpdateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         range: "コメント分析!G2:K2",
         valueInputOption: "RAW",

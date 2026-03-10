@@ -243,6 +243,86 @@ describe("buildCommentDbRows", () => {
       ],
     ]);
   });
+
+  it("reuses existing analyzed comment data when available", () => {
+    const items: ExtractVideoResponse[] = [
+      {
+        rawData: {
+          videoId: "abc123",
+          url: "https://www.youtube.com/watch?v=abc123",
+          thumbnailUrl: "https://i.ytimg.com/vi/abc123/hqdefault.jpg",
+          title: "Test Title",
+          channelId: "channel-1",
+          channelName: "Test Channel",
+          subscribers: 999,
+          channelCreatedAt: "2020-01-01T00:00:00Z",
+          publishedAt: "2024-01-01T00:00:00Z",
+          views: 1234,
+          duration: "PT10M",
+          transcript: [],
+          comments: [{ author: "a", text: "first", likes: 1 }],
+        },
+        metadata: {
+          title: "Test Title",
+          thumbnailUrl: "https://i.ytimg.com/vi/abc123/hqdefault.jpg",
+          viewCount: "1234",
+          publishDate: "2024-01-01T00:00:00Z",
+          author: "Test Channel",
+        },
+        diagnostics: {
+          metadata: [{ stage: "data-api", success: true }],
+          transcript: [{ stage: "watch-page", success: true }],
+          comments: [{ stage: "innertube", success: true }],
+        },
+      },
+    ];
+
+    expect(
+      buildCommentDbRows(
+        items,
+        [
+          {
+            scriptId: "abc123-script",
+            transcriptUrl: "https://example.com/scripts/abc123-script?tab=transcript",
+            commentsUrl: "https://example.com/scripts/abc123-script?tab=comments",
+          },
+        ],
+        "2026-03-07T00:00:00.000Z",
+        new Map([
+          [
+            JSON.stringify(["abc123", "a", "first"]),
+            {
+              sentiment: "positive",
+              viewerType: "視聴者像",
+              psychology: "心理",
+              note: "メモ",
+              analysisUpdatedAt: "2026-03-09T00:00:00.000Z",
+            },
+          ],
+        ]),
+      ),
+    ).toEqual([
+      [
+        "abc123-script:1",
+        "abc123-script",
+        "abc123",
+        "https://www.youtube.com/watch?v=abc123",
+        "Test Title",
+        "Test Channel",
+        "2024-01-01T00:00:00Z",
+        1,
+        "a",
+        "first",
+        1,
+        "2026-03-07T00:00:00.000Z",
+        "positive",
+        "視聴者像",
+        "心理",
+        "メモ",
+        "2026-03-09T00:00:00.000Z",
+      ],
+    ]);
+  });
 });
 
 describe("buildCommentSheetRows", () => {
@@ -316,6 +396,79 @@ describe("buildCommentSheetRows", () => {
         "",
         "",
         "",
+      ],
+    ]);
+  });
+
+  it("reuses existing analyzed comment data when available", () => {
+    const items: ExtractVideoResponse[] = [
+      {
+        rawData: {
+          videoId: "abc123",
+          url: "https://www.youtube.com/watch?v=abc123",
+          thumbnailUrl: "https://i.ytimg.com/vi/abc123/hqdefault.jpg",
+          title: "Test Title",
+          channelId: "channel-1",
+          channelName: "Test Channel",
+          subscribers: 999,
+          channelCreatedAt: "2020-01-01T00:00:00Z",
+          publishedAt: "2024-01-01T00:00:00Z",
+          views: 1234,
+          duration: "PT10M",
+          transcript: [],
+          comments: [{ author: "a", text: "first", likes: 1 }],
+        },
+        metadata: {
+          title: "Test Title",
+          thumbnailUrl: "https://i.ytimg.com/vi/abc123/hqdefault.jpg",
+          viewCount: "1234",
+          publishDate: "2024-01-01T00:00:00Z",
+          author: "Test Channel",
+        },
+        diagnostics: {
+          metadata: [{ stage: "data-api", success: true }],
+          transcript: [{ stage: "watch-page", success: true }],
+          comments: [{ stage: "innertube", success: true }],
+        },
+      },
+    ];
+
+    expect(
+      buildCommentSheetRows(
+        items,
+        [
+          {
+            scriptId: "abc123-script",
+            transcriptUrl: "https://example.com/scripts/abc123-script?tab=transcript",
+            commentsUrl: "https://example.com/scripts/abc123-script?tab=comments",
+          },
+        ],
+        new Map([
+          [
+            JSON.stringify(["abc123", "a", "first"]),
+            {
+              sentiment: "positive",
+              viewerType: "視聴者像",
+              psychology: "心理",
+              note: "メモ",
+              analysisUpdatedAt: "2026-03-09T00:00:00.000Z",
+            },
+          ],
+        ]),
+      ),
+    ).toEqual([
+      [
+        "abc123-script:1",
+        "Test Title",
+        "https://www.youtube.com/watch?v=abc123",
+        "Test Channel",
+        "a",
+        "first",
+        "positive",
+        "視聴者像",
+        "心理",
+        "メモ",
+        "2026-03-09T00:00:00.000Z",
       ],
     ]);
   });

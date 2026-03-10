@@ -86,6 +86,46 @@ function downloadJsonFile(fileName: string, payload: unknown): void {
   URL.revokeObjectURL(blobUrl);
 }
 
+function downloadBlobFile(fileName: string, blob: Blob): void {
+  const blobUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(blobUrl);
+}
+
+function sanitizeFileName(value: string): string {
+  const normalized = value
+    .normalize("NFKC")
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return (normalized || "video").slice(0, 60);
+}
+
+function inferThumbnailExtension(contentType: string | null, fallbackUrl: string): string {
+  if (contentType?.includes("png")) {
+    return "png";
+  }
+
+  if (contentType?.includes("webp")) {
+    return "webp";
+  }
+
+  if (contentType?.includes("gif")) {
+    return "gif";
+  }
+
+  const fromUrl = fallbackUrl.match(/\.([a-zA-Z0-9]+)(?:\?|$)/)?.[1]?.toLowerCase();
+  if (fromUrl) {
+    return fromUrl;
+  }
+
+  return "jpg";
+}
+
 function toThemeStyle(design: PencilConsoleDesign): React.CSSProperties {
   const { layout, theme } = design;
 
@@ -323,7 +363,9 @@ export function ResearchConsole({ design }: { design: PencilConsoleDesign }): Re
   const [videoResults, setVideoResults] = useState<ExtractedVideoCard[]>([]);
   const [videoError, setVideoError] = useState("");
   const [sheetMessage, setSheetMessage] = useState("");
+  const [downloadMessage, setDownloadMessage] = useState("");
   const [isExportingToSheets, setIsExportingToSheets] = useState(false);
+  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [lastExtractionMode, setLastExtractionMode] = useState<ExtractionMode>("all");
   const [activeAnalysisCardIndex, setActiveAnalysisCardIndex] = useState<number | null>(null);
@@ -372,6 +414,7 @@ export function ResearchConsole({ design }: { design: PencilConsoleDesign }): Re
   function startVideoExtraction(mode: ExtractionMode): void {
     setVideoError("");
     setSheetMessage("");
+    setDownloadMessage("");
     setActiveAnalysisCardIndex(null);
     setActiveAnalysisTab("transcript");
     setLastExtractionMode(mode);
@@ -469,6 +512,7 @@ export function ResearchConsole({ design }: { design: PencilConsoleDesign }): Re
     }
 
     setSheetMessage("");
+    setDownloadMessage("");
     setIsExportingToSheets(true);
 
     void (async () => {
@@ -502,15 +546,63 @@ export function ResearchConsole({ design }: { design: PencilConsoleDesign }): Re
 
   function handleDownloadAllJson(): void {
     if (successfulResults.length === 0) {
-      setSheetMessage("JSONを出力できる抽出結果がありません。");
+      setDownloadMessage("JSONを出力できる抽出結果がありません。");
       return;
     }
 
-    downloadJsonFile("youtube-extract-results.json", {
-      exportedAt: new Date().toISOString(),
-      count: successfulResults.length,
-      items: successfulResults,
-    });
+    setSheetMessage("");
+    setDownloadMessage("");
+    setIsDownloadingZip(true);
+
+    void (async () => {
+      try {
+        const { default: JSZip } = await import("jszip");
+        const zip = new JSZip();
+        const rootFolder = zip.folder("youtube-extract-results");
+        if (!rootFolder) {
+          throw new Error("ZIPフォルダの作成に失敗しました。");
+        }
+
+        await Promise.all(
+          successfulResults.map(async (result, index) => {
+            const safeBaseName = sanitizeFileName(
+              `${String(index + 1).padStart(2, "0")}_${result.rawData.title || result.rawData.videoId || "video"}`,
+            );
+            const itemFolder = rootFolder.folder(safeBaseName);
+            if (!itemFolder) {
+              return;
+            }
+
+            itemFolder.file(`${safeBaseName}.json`, JSON.stringify(result, null, 2));
+
+            if (!result.rawData.thumbnailUrl) {
+              return;
+            }
+
+            try {
+              const response = await fetch(result.rawData.thumbnailUrl);
+              if (!response.ok) {
+                return;
+              }
+
+              const thumbnailBlob = await response.blob();
+              const extension = inferThumbnailExtension(response.headers.get("content-type"), result.rawData.thumbnailUrl);
+              itemFolder.file(`thumbnail.${extension}`, thumbnailBlob);
+            } catch {
+              // ignore thumbnail download errors and keep JSON export
+            }
+          }),
+        );
+
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        downloadBlobFile("youtube-extract-results.zip", zipBlob);
+        setDownloadMessage(`${formatCount(successfulResults.length)}件を ZIP で保存しました。`);
+      } catch (error) {
+        setDownloadMessage(error instanceof Error ? error.message : "ZIPの保存に失敗しました。");
+      } finally {
+        setIsDownloadingZip(false);
+      }
+    })();
   }
 
   function handleDownloadSingleJson(result: ExtractVideoResponse): void {
@@ -824,14 +916,15 @@ export function ResearchConsole({ design }: { design: PencilConsoleDesign }): Re
                     </button>
                     <button
                       className={styles.tertiaryButton}
-                      disabled={pendingCount > 0 || successfulResults.length === 0}
+                      disabled={isDownloadingZip || pendingCount > 0 || successfulResults.length === 0}
                       onClick={handleDownloadAllJson}
                       type="button"
                     >
-                      JSON一括DL
+                      {isDownloadingZip ? "ZIP作成中..." : "ZIP一括DL"}
                     </button>
                   </div>
                   {sheetMessage ? <p className={styles.captionText}>{sheetMessage}</p> : null}
+                  {downloadMessage ? <p className={styles.captionText}>{downloadMessage}</p> : null}
                 </div>
               </>
             ) : (

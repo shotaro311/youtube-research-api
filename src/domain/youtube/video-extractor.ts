@@ -655,6 +655,30 @@ async function fetchTranscriptFromInnertubeAndroid(videoId: string): Promise<Tra
   return withTimeout(fetchCore(), TRANSCRIPT_FALLBACK_TIMEOUT_MS, "Transcript android fallback fetch timed out");
 }
 
+async function fetchTranscriptFromYoutubeJs(videoId: string): Promise<TranscriptSegmentRow[]> {
+  const fetchCore = async () => {
+    const youtube = await Innertube.create({
+      lang: "ja",
+      location: "JP",
+      generate_session_locally: true,
+    });
+    const info = await youtube.getInfo(videoId);
+    const transcriptInfo = await info.getTranscript();
+    const segments = transcriptInfo.transcript?.content?.body?.initial_segments ?? [];
+
+    return normalizeTranscriptSegments(
+      segments
+        .map((segment) => ({
+          start: typeof segment?.start_ms === "number" ? segment.start_ms / 1000 : Number.NaN,
+          text: typeof segment?.snippet?.toString === "function" ? segment.snippet.toString() : "",
+        }))
+        .filter((segment) => Number.isFinite(segment.start) && segment.text.trim().length > 0),
+    );
+  };
+
+  return withTimeout(fetchCore(), TRANSCRIPT_FALLBACK_TIMEOUT_MS, "Transcript youtubei fallback fetch timed out");
+}
+
 async function isYtDlpAvailable(): Promise<boolean> {
   if (ytDlpAvailableCache !== null) return ytDlpAvailableCache;
 
@@ -783,6 +807,7 @@ async function fetchTranscriptDiagnosticsWithDuration(videoId: string, expectedD
     { stage: "yt-dlp", run: () => fetchTranscriptFromYtDlp(videoId) },
     { stage: "caption-extractor", run: () => fetchTranscriptFromCaptionExtractor(videoId) },
     { stage: "transcript-plus", run: () => fetchTranscriptFromTranscriptPlus(videoId) },
+    { stage: "youtubei", run: () => fetchTranscriptFromYoutubeJs(videoId) },
     { stage: "innertube-android", run: () => fetchTranscriptFromInnertubeAndroid(videoId) },
     { stage: "watch-page", run: () => fetchTranscriptFromWatchPage(videoId) },
   ];

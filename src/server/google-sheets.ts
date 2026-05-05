@@ -10,7 +10,7 @@ import { parseStoredComments } from "../domain/youtube/stored-comment";
 import type { ExtractVideoResponse } from "../domain/youtube/types";
 
 const DEFAULT_CREDENTIALS_FILE = "gen-lang-client-0823751047-629dc32ab24d.json";
-const DEFAULT_SPREADSHEET_ID = "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME";
+const DEFAULT_SPREADSHEET_ID = "1xEX6oQW_utPzfFDN6sFsk5aT2JwXIcaIQ8mD00fP09Q";
 const DEFAULT_SHEET_NAME = "動画分析";
 const DEFAULT_SCRIPT_DB_SHEET_NAME = "台本DB";
 const DEFAULT_COMMENT_DB_SHEET_NAME = "コメントDB";

@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { fetchTranscriptMock, getSubtitlesMock } = vi.hoisted(() => ({
+const { fetchTranscriptMock, getSubtitlesMock, innertubeCreateMock } = vi.hoisted(() => ({
   fetchTranscriptMock: vi.fn(),
   getSubtitlesMock: vi.fn(),
+  innertubeCreateMock: vi.fn(),
 }));
 
 vi.hoisted(() => {
@@ -19,7 +20,7 @@ vi.mock("youtube-transcript-plus", () => ({
 
 vi.mock("youtubei.js", () => ({
   Innertube: {
-    create: vi.fn(),
+    create: innertubeCreateMock,
   },
 }));
 
@@ -39,6 +40,19 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
   process.env.VERCEL = "1";
   process.env.YOUTUBE_API_KEY = "test-api-key";
+  innertubeCreateMock.mockResolvedValue({
+    getInfo: vi.fn().mockResolvedValue({
+      getTranscript: vi.fn().mockResolvedValue({
+        transcript: {
+          content: {
+            body: {
+              initial_segments: [],
+            },
+          },
+        },
+      }),
+    }),
+  });
 
   fetchMock.mockImplementation(async (input) => {
     const url = String(input);
@@ -323,6 +337,7 @@ describe("extractVideoResearchRaw transcript selection", () => {
       { stage: "yt-dlp", success: false, error: "No segments returned" },
       { stage: "caption-extractor", success: false, error: "No segments returned" },
       { stage: "transcript-plus", success: false, error: "No segments returned" },
+      { stage: "youtubei", success: false, error: "No segments returned" },
       { stage: "innertube-android", success: false, error: "No segments returned" },
       { stage: "watch-page", success: true },
     ]);
@@ -416,8 +431,62 @@ describe("extractVideoResearchRaw transcript selection", () => {
       { stage: "yt-dlp", success: false, error: "No segments returned" },
       { stage: "caption-extractor", success: false, error: "No segments returned" },
       { stage: "transcript-plus", success: false, error: "No segments returned" },
+      { stage: "youtubei", success: false, error: "No segments returned" },
       { stage: "innertube-android", success: false, error: "No segments returned" },
       { stage: "watch-page", success: true },
+    ]);
+  });
+
+  it("falls back to youtubei transcript when other transcript providers return nothing", async () => {
+    getSubtitlesMock.mockResolvedValue([]);
+    fetchTranscriptMock.mockResolvedValue([]);
+    innertubeCreateMock.mockResolvedValue({
+      getInfo: vi.fn().mockResolvedValue({
+        getTranscript: vi.fn().mockResolvedValue({
+          transcript: {
+            content: {
+              body: {
+                initial_segments: [
+                  {
+                    start_ms: 0,
+                    snippet: { toString: () => "冒頭" },
+                  },
+                  {
+                    start_ms: 245000,
+                    snippet: { toString: () => "中盤" },
+                  },
+                ],
+              },
+            },
+          },
+        }),
+      }),
+    });
+
+    const result = await extractVideoResearchRaw({
+      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      includeComments: false,
+    });
+
+    expect(result.rawData.transcript).toEqual([
+      { time: "00:00", text: "冒頭" },
+      { time: "04:05", text: "中盤" },
+    ]);
+    expect(result.diagnostics.transcript).toEqual([
+      { stage: "yt-dlp", success: false, error: "No segments returned" },
+      { stage: "caption-extractor", success: false, error: "No segments returned" },
+      { stage: "transcript-plus", success: false, error: "No segments returned" },
+      { stage: "youtubei", success: true },
+      {
+        stage: "innertube-android",
+        success: false,
+        error: "Unexpected fetch in test: https://www.youtube.com/watch?v=dQw4w9WgXcQ&hl=ja&persist_hl=1&bpctr=9999999999&has_verified=1",
+      },
+      {
+        stage: "watch-page",
+        success: false,
+        error: "Unexpected fetch in test: https://www.youtube.com/watch?v=dQw4w9WgXcQ&hl=ja&persist_hl=1&bpctr=9999999999&has_verified=1",
+      },
     ]);
   });
 });

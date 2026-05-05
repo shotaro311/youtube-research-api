@@ -271,7 +271,7 @@
                     },
                     {
                       "type": "frame",
-                      "id": "Pe353",
+                      "id": "WQkqj",
                       "name": "Resolver URL Textarea",
                       "width": 588,
                       "height": 547,
@@ -282,7 +282,8 @@
                       "children": [
                         {
                           "type": "text",
-                          "id": "KiKR2",
+                          "id": "Y1XO1",
+                          "name": "textareaText",
                           "fill": "#D7DCE3",
                           "content": "https://www.youtube.com/watch?v=alpha000001\nhttps://www.youtube.com/watch?v=alpha000002\nhttps://www.youtube.com/watch?v=alpha000003\nhttps://www.youtube.com/watch?v=alpha000004\nhttps://www.youtube.com/watch?v=alpha000005\nhttps://www.youtube.com/watch?v=alpha000006",
                           "fontFamily": "Inter",

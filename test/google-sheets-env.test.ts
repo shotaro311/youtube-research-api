@@ -587,7 +587,7 @@ describe("appendAiExtractRows", () => {
     expect(batchUpdateMock).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        spreadsheetId: "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME",
+        spreadsheetId: "1xEX6oQW_utPzfFDN6sFsk5aT2JwXIcaIQ8mD00fP09Q",
         requestBody: {
           requests: [
             {
@@ -608,7 +608,7 @@ describe("appendAiExtractRows", () => {
     expect(batchUpdateMock).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        spreadsheetId: "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME",
+        spreadsheetId: "1xEX6oQW_utPzfFDN6sFsk5aT2JwXIcaIQ8mD00fP09Q",
         requestBody: {
           requests: [
             {
@@ -627,7 +627,7 @@ describe("appendAiExtractRows", () => {
       }),
     );
     expect(valueUpdateMock).toHaveBeenCalledWith({
-      spreadsheetId: "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME",
+      spreadsheetId: "1xEX6oQW_utPzfFDN6sFsk5aT2JwXIcaIQ8mD00fP09Q",
       range: "コメントDB!A1:Q1",
       valueInputOption: "RAW",
       requestBody: {
@@ -635,7 +635,7 @@ describe("appendAiExtractRows", () => {
       },
     });
     expect(valueUpdateMock).toHaveBeenCalledWith({
-      spreadsheetId: "1s49OtI3R2PoGS_DjsymEbzg3IlNPBqgVIILEzBLN6ME",
+      spreadsheetId: "1xEX6oQW_utPzfFDN6sFsk5aT2JwXIcaIQ8mD00fP09Q",
       range: "コメント分析!A1:K1",
       valueInputOption: "RAW",
       requestBody: {
